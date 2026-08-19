@@ -1,0 +1,7 @@
+Diagnostic reasoning in emergency medicine
+
+Clinicians anchor on the first plausible hypothesis and stop searching.
+Availability bias makes recent cases feel more probable than they are.
+The teaching point is that structured checklists reduce diagnostic error
+without slowing the consultation down. Patients with atypical presentations
+suffer the most from premature closure.

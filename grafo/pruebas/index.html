@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pruebas · Grafo de conocimiento</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2316181b'/%3E%3Cg stroke='%236db6e8' stroke-width='1.4' fill='none'%3E%3Cpath d='M8 22 L16 9 L24 22 M8 22 L24 22 M16 9 L16 22'/%3E%3C/g%3E%3Cg fill='%235fd39b'%3E%3Ccircle cx='16' cy='9' r='3'/%3E%3Ccircle cx='8' cy='22' r='2.6'/%3E%3Ccircle cx='24' cy='22' r='2.6'/%3E%3Ccircle cx='16' cy='22' r='2.2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="../css/estilo.css">
+<style>
+  .caso { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid var(--linea); font-size: 13.5px; }
+  .caso .marca { font-family: var(--mono); width: 1.4em; flex: 0 0 1.4em; text-align: center; }
+  .caso.ok .marca { color: var(--ok); }
+  .caso.fallo .marca { color: var(--fallo); }
+  .caso.corriendo .marca { color: var(--texto-tenue); }
+  .caso .detalle { font-family: var(--mono); font-size: 11.5px; color: var(--fallo); display: block; margin-top: 4px; white-space: pre-wrap; }
+  .grupo { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--texto-tenue); margin: 20px 0 4px; font-weight: 600; }
+</style>
+</head>
+<body>
+<header class="principal">
+  <h1>Pruebas</h1>
+  <span class="fase">fases 1 y 2</span>
+  <span class="estado" id="marcador">—</span>
+</header>
+<div class="envoltorio">
+  <section class="bloque">
+    <p class="nota">
+      Este corredor ejecuta las mismas pruebas que <code>node pruebas/nodo.js</code> y añade
+      las que sólo existen en el navegador: workers, IndexedDB y el ciclo completo de
+      indexación incremental. Es la comprobación que hay que ver en verde <b>en el iPad</b>.
+    </p>
+    <div class="acciones">
+      <button class="primario" id="btn-correr">Ejecutar</button>
+      <button id="btn-limpiar">Borrar el índice de este navegador</button>
+    </div>
+    <div class="cifras" id="resumen" style="margin-top:14px" hidden></div>
+  </section>
+  <section class="bloque">
+    <h2>Resultados</h2>
+    <div id="salida"></div>
+  </section>
+</div>
+
+<script src="../js/nucleo/hash.js"></script>
+<script src="../js/nucleo/bytes.js"></script>
+<script src="../js/nucleo/vacias.js"></script>
+<script src="../js/nucleo/terminos.js"></script>
+<script src="../js/nucleo/almacen.js"></script>
+<script src="../js/nucleo/diff.js"></script>
+<script src="../js/nucleo/indice.js"></script>
+<script src="../js/nucleo/pool.js"></script>
+<script src="../js/nucleo/indexador.js"></script>
+<script src="../vendor/pdf.min.js"></script>
+<script src="../vendor/mammoth.browser.min.js"></script>
+<script src="../js/parsers/texto.js"></script>
+<script src="../js/parsers/rtf.js"></script>
+<script src="../js/parsers/html.js"></script>
+<script src="../js/parsers/datos.js"></script>
+<script src="../js/parsers/pdf.js"></script>
+<script src="../js/parsers/docx.js"></script>
+<script src="../js/parsers/binario.js"></script>
+<script src="../js/parsers/registro.js"></script>
+<script src="casos.js"></script>
+<script src="casos-navegador.js"></script>
+<script>
+(function () {
+  'use strict';
+  var GC = self.GC;
+  var salida = document.getElementById('salida');
+  var marcador = document.getElementById('marcador');
+
+  if (self.pdfjsLib && self.pdfjsLib.GlobalWorkerOptions) {
+    self.pdfjsLib.GlobalWorkerOptions.workerSrc = '../vendor/pdf.worker.min.js';
+  }
+
+  var entorno = {
+    muestra: async function (nombre) {
+      var r = await fetch('muestras/' + nombre);
+      if (!r.ok) throw new Error('no se pudo leer la muestra ' + nombre + ' (' + r.status + ')');
+      return new Uint8Array(await r.arrayBuffer());
+    },
+    pdfjsLib: self.pdfjsLib,
+    mammoth: self.mammoth
+  };
+
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+  async function correr() {
+    salida.innerHTML = '';
+    document.getElementById('resumen').hidden = true;
+    var lista = GC.casos.casos.concat(GC.casosNavegador.casos);
+    var ok = 0, fallos = 0, grupo = '';
+    var t0 = performance.now();
+
+    for (var i = 0; i < lista.length; i++) {
+      var c = lista[i];
+      if (c.grupo !== grupo) {
+        grupo = c.grupo;
+        salida.insertAdjacentHTML('beforeend', '<div class="grupo">' + esc(grupo) + '</div>');
+      }
+      var fila = document.createElement('div');
+      fila.className = 'caso corriendo';
+      fila.innerHTML = '<span class="marca">·</span><span>' + esc(c.nombre) + '</span>';
+      salida.appendChild(fila);
+      marcador.textContent = (i + 1) + ' / ' + lista.length;
+      await new Promise(function (r) { requestAnimationFrame(function () { r(); }); });
+
+      try {
+        await c.fn(entorno);
+        ok++;
+        fila.className = 'caso ok';
+        fila.querySelector('.marca').textContent = '✓';
+      } catch (e) {
+        fallos++;
+        fila.className = 'caso fallo';
+        fila.querySelector('.marca').textContent = '✗';
+        fila.insertAdjacentHTML('beforeend', '<span class="detalle">' + esc(e && e.message || e) + '</span>');
+      }
+    }
+
+    var ms = performance.now() - t0;
+    var r = document.getElementById('resumen');
+    r.hidden = false;
+    r.innerHTML =
+      '<div class="cifra ok"><b>' + ok + '</b><span>correctas</span></div>' +
+      '<div class="cifra ' + (fallos ? 'fallo' : '') + '"><b>' + fallos + '</b><span>fallidas</span></div>' +
+      '<div class="cifra"><b>' + Math.round(ms) + '</b><span>ms</span></div>';
+    marcador.textContent = fallos ? fallos + ' fallidas' : 'todo en verde';
+  }
+
+  document.getElementById('btn-correr').addEventListener('click', correr);
+  document.getElementById('btn-limpiar').addEventListener('click', async function () {
+    if (!confirm('Se borra el índice guardado en este navegador. ¿Continuar?')) return;
+    await GC.almacen.borrarTodo();
+    marcador.textContent = 'índice borrado';
+  });
+  correr();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="color-scheme" content="dark">
+<title>Grafo de conocimiento</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2316181b'/%3E%3Cg stroke='%236db6e8' stroke-width='1.4' fill='none'%3E%3Cpath d='M8 22 L16 9 L24 22 M8 22 L24 22 M16 9 L16 22'/%3E%3C/g%3E%3Cg fill='%235fd39b'%3E%3Ccircle cx='16' cy='9' r='3'/%3E%3Ccircle cx='8' cy='22' r='2.6'/%3E%3Ccircle cx='24' cy='22' r='2.6'/%3E%3Ccircle cx='16' cy='22' r='2.2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+
+<header class="principal">
+  <h1>Grafo de conocimiento</h1>
+  <span class="fase">Fases 1 y 2 · ingesta e índice</span>
+  <span class="estado" id="estado-global">iniciando…</span>
+</header>
+
+<div class="envoltorio">
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-capacidades">
+    <h2>Capacidades del dispositivo <span class="cuenta" id="ruta-elegida"></span></h2>
+    <p class="nota">
+      Nada aquí se deduce del navegador declarado: cada ruta se sondea en tiempo de ejecución.
+      El caso de <code>webkitdirectory</code> en iPadOS es contradictorio en la documentación,
+      así que además del sondeo hay una <b>verificación empírica</b>: se abre el selector una vez
+      y se comprueba si de verdad llegan rutas de carpeta. El resultado queda guardado.
+    </p>
+    <div class="rejilla" id="rejilla-rutas"></div>
+    <div class="acciones">
+      <button class="menor" id="btn-verificar-b">Verificar ruta B en este iPad</button>
+      <button class="menor" id="btn-reset-verif">Olvidar verificaciones</button>
+    </div>
+    <details class="plegable" id="detalles-entorno">
+      <summary>Entorno de ejecución</summary>
+      <div class="desplaza"><table class="datos" id="tabla-entorno"></table></div>
+    </details>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-ingesta">
+    <h2>Carpeta</h2>
+    <p class="nota" id="nota-ingesta"></p>
+    <div class="acciones" id="acciones-ingesta"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-progreso" hidden>
+    <h2>Indexando</h2>
+    <div class="progreso">
+      <div class="linea"><span id="progreso-fase">preparando</span><span id="progreso-cuenta">0 / 0</span></div>
+      <div class="barra"><i id="progreso-barra"></i></div>
+      <div class="encurso" id="progreso-encurso"></div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-resumen" hidden>
+    <h2>Índice</h2>
+    <div class="cifras" id="cifras-indice"></div>
+    <details class="plegable">
+      <summary>Reparto por extensión</summary>
+      <div class="desplaza"><table class="datos" id="tabla-extensiones"></table></div>
+    </details>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-cambios" hidden>
+    <h2>Qué cambió <span class="cuenta" id="cambios-fecha"></span></h2>
+    <div id="contenido-cambios"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-errores" hidden>
+    <h2>No leídos <span class="cuenta" id="errores-cuenta"></span></h2>
+    <p class="nota">
+      Ningún documento de esta lista aporta contenido al grafo. No se rellena nada:
+      un documento ilegible se queda ilegible y visible.
+    </p>
+    <div class="tabla-alta desplaza"><table class="datos" id="tabla-errores"></table></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-inventario" hidden>
+    <h2>Documentos <span class="cuenta" id="inventario-cuenta"></span></h2>
+    <label class="campo" for="filtro-inventario">Filtrar por ruta o extensión</label>
+    <input type="text" id="filtro-inventario" placeholder="p. ej. clinica/ o .pdf" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="tabla-alta desplaza" style="margin-top:8px"><table class="datos" id="tabla-inventario"></table></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-conceptos" hidden>
+    <h2>Vocabulario <span class="cuenta" id="conceptos-cuenta"></span></h2>
+    <p class="nota">
+      Conteo por documento, no por repetición. El grafo de co-ocurrencia,
+      las comunidades y la intermediación llegan en la Fase 3.
+    </p>
+    <div class="fichas-conceptos" id="lista-conceptos"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-historial" hidden>
+    <h2>Instantáneas <span class="cuenta" id="historial-cuenta"></span></h2>
+    <p class="nota">Cada apertura deja un estado guardado. Es el material del deslizador temporal de la Fase 5.</p>
+    <div class="desplaza"><table class="datos" id="tabla-historial"></table></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque">
+    <h2>Ajustes</h2>
+    <details class="plegable">
+      <summary>Palabras vacías propias</summary>
+      <div>
+        <p class="nota">
+          Una por línea o separadas por comas. Se suman a la lista base bilingüe
+          (español e inglés). Cambiarlas obliga a reindexar para que surtan efecto.
+        </p>
+        <textarea id="vacias-propias" rows="4" placeholder="paciente&#10;consulta&#10;hospital"></textarea>
+        <div class="acciones">
+          <button class="menor" id="btn-guardar-vacias">Guardar</button>
+          <span class="etiqueta" id="vacias-cuenta"></span>
+        </div>
+      </div>
+    </details>
+    <details class="plegable">
+      <summary>Almacenamiento</summary>
+      <div>
+        <p class="nota" id="nota-espacio">—</p>
+        <div class="acciones">
+          <button class="menor" id="btn-persistir">Pedir almacenamiento persistente</button>
+          <button class="menor peligro" id="btn-borrar">Borrar el índice completo</button>
+        </div>
+      </div>
+    </details>
+    <details class="plegable">
+      <summary>Privacidad</summary>
+      <div>
+        <p class="nota">
+          Todo el procesamiento ocurre en este dispositivo. Esta aplicación no hace
+          ninguna petición de red a ningún servidor: los documentos, sus fragmentos y
+          sus metadatos no salen del navegador. La capa de IA de la Fase 6 aún no existe;
+          cuando exista estará apagada por defecto y mostrará el contenido exacto de
+          cada envío antes de realizarlo.
+        </p>
+      </div>
+    </details>
+  </section>
+
+</div>
+
+<div class="barra-inferior" id="barra-inferior">
+  <span>docs <b id="bi-docs">—</b></span><span class="sep">│</span>
+  <span>conceptos <b id="bi-conceptos">—</b></span><span class="sep">│</span>
+  <span>palabras <b id="bi-palabras">—</b></span><span class="sep">│</span>
+  <span>no leídos <b id="bi-errores">—</b></span><span class="sep">│</span>
+  <span>arranque <b id="bi-arranque">—</b></span><span class="sep">│</span>
+  <span>último índice <b id="bi-duracion">—</b></span>
+</div>
+
+<script src="js/nucleo/hash.js"></script>
+<script src="js/nucleo/bytes.js"></script>
+<script src="js/nucleo/vacias.js"></script>
+<script src="js/nucleo/terminos.js"></script>
+<script src="js/nucleo/almacen.js"></script>
+<script src="js/nucleo/diff.js"></script>
+<script src="js/nucleo/indice.js"></script>
+<script src="js/nucleo/pool.js"></script>
+<script src="js/nucleo/indexador.js"></script>
+<script src="js/ingesta/capacidades.js"></script>
+<script src="js/ingesta/ingesta.js"></script>
+<script src="js/ui/formato.js"></script>
+<script src="js/ui/vistas.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
