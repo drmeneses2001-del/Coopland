@@ -178,6 +178,37 @@ modificación ajusta el conteo de documentos por lema leyendo los lemas previos
 del documento afectado. Por eso «conceptos que aparecen por primera vez» y
 «conceptos que desaparecieron» son afirmaciones exactas, no estimaciones.
 
+### El grafo y las brechas
+
+**La intermediación se calcula sin pesos, y por muestreo cuando el grafo
+crece.** Brandes exacto por debajo de 1200 nodos; por encima, muestreo de
+pivotes con azar de semilla fija —la misma carpeta da el mismo grafo en cada
+apertura, porque si no el deslizador temporal mostraría cambios que nadie
+escribió—. El panel dice siempre cuál de las dos se usó y con cuántos pivotes.
+
+**La densidad interna de una comunidad se compara con la densidad del grafo
+completo, no con la mediana de las comunidades.** Con dos comunidades la mediana
+descarta una por definición y con tres descarta la mitad: el cálculo de brechas
+devolvía cero en el caso más común. Una comunidad más densa que el grafo entero
+es cohesiva; ésa es la comparación que se sostiene.
+
+**Un concepto puente puede tener un solo vecino a cada lado.** Es la forma
+canónica de un puente, y exigirle dos lo descartaba justo en el caso que
+importa. Lo que filtra el ruido no es el grado sino la intermediación, que entra
+como factor en la puntuación.
+
+**«Rico en contenido» es relativo al corpus.** El umbral de documento aislado es
+la mediana de términos propios del propio archivo, no un número fijo: un umbral
+absoluto declara aislado a medio archivo de notas breves y a ninguno de un
+archivo de artículos largos.
+
+**Las preguntas por plantilla se eligen de forma determinista** a partir de la
+propia brecha, así que la misma brecha da siempre la misma redacción y dos
+brechas de la misma sesión no salen escritas igual. Están redactadas para
+funcionar con listas de uno o varios términos —sin verbos que tengan que
+concordar con la lista—, y su `cargaParaIA` contiene sólo términos y nombres de
+clúster: hay una prueba que falla si alguna vez se cuela texto de un documento.
+
 ### La lematización, que es donde estaba el riesgo
 
 Es deliberadamente conservadora: ante la duda, dos nodos separados antes que

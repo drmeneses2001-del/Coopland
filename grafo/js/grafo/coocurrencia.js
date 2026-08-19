@@ -158,8 +158,18 @@
       };
     }
 
+    // Índice invertido exacto lema -> documentos. El campo `rutas` de cada nodo
+    // viene recortado a 50 para que el grafo guardado no crezca sin control; el
+    // cálculo de brechas necesita el conjunto completo, y lo pide por aquí.
+    function indiceDocumentos() {
+      var m = new Map();
+      nodos.forEach(function (n, lema) { m.set(lema, n.docs); });
+      return m;
+    }
+
     return {
       agregar: agregar, agregarRuta: agregarRuta, construir: construir,
+      indiceDocumentos: indiceDocumentos,
       tamano: function () { return { nodos: nodos.size, aristas: aristas.size, documentos: documentos }; }
     };
   }

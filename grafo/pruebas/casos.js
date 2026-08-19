@@ -14,7 +14,9 @@
         louvain: require('../js/grafo/louvain.js'),
         metricas: require('../js/grafo/metricas.js'),
         documentos: require('../js/grafo/documentos.js'),
-        mixta: require('../js/grafo/mixta.js')
+        mixta: require('../js/grafo/mixta.js'),
+        brechas: require('../js/grafo/brechas.js'),
+        preguntas: require('../js/grafo/preguntas.js')
       },
       colores: require('../js/ui/colores.js'),
       parsers: {
@@ -712,6 +714,242 @@
       var c = M.colores.aRgb(i);
       afirmar(/^rgb\(\d{1,3},\d{1,3},\d{1,3}\)$/.test(c), 'color inválido en ' + i + ': ' + c);
     }
+  });
+
+
+  // ============================ Fase 4: brechas =============================
+
+  // Dos territorios densos por dentro, casi sin contacto, unidos por un solo
+  // concepto poco frecuente. Es el caso que las tres definiciones deben cazar.
+  function corpusConBrecha() {
+    var aristas = [];
+    function camarilla(ids, peso) {
+      for (var i = 0; i < ids.length; i++) {
+        for (var j = i + 1; j < ids.length; j++) aristas.push({ a: ids[i], b: ids[j], peso: peso || 3 });
+      }
+    }
+    camarilla([0, 1, 2, 3]);            // clínica
+    camarilla([4, 5, 6, 7]);            // docencia
+    aristas.push({ a: 3, b: 8, peso: 1 }, { a: 8, b: 4, peso: 1 });   // puente por el 8
+
+    var formas = ['edema', 'disnea', 'ortopnea', 'congestion',
+                  'docencia', 'simulacion', 'evaluacion', 'curriculum', 'residente'];
+    var nodos = formas.map(function (l, i) {
+      return { id: i, lema: l, forma: l, frecuencia: i < 8 ? 20 : 3, docs: 2, rutas: [] };
+    });
+    var comunidad = [0, 0, 0, 0, 1, 1, 1, 1, 0];
+    var intermediacion = new Float64Array([0.05, 0.05, 0.05, 0.40, 0.40, 0.05, 0.05, 0.05, 0.90]);
+
+    // «residente» aparece en los dos documentos, pero nunca con ambos lados.
+    var docsPorLema = new Map();
+    formas.forEach(function (l, i) {
+      docsPorLema.set(l, new Set(i < 4 ? ['clinica/a.md'] : (i < 8 ? ['docencia/b.md'] : ['clinica/a.md', 'docencia/b.md'])));
+    });
+
+    var capaDocumentos = {
+      nodos: [
+        { id: 0, ruta: 'clinica/a.md', nombre: 'a.md', estado: 'ok', palabras: 400, terminos: 30 },
+        { id: 1, ruta: 'docencia/b.md', nombre: 'b.md', estado: 'ok', palabras: 380, terminos: 28 },
+        { id: 2, ruta: 'notas/suelto.md', nombre: 'suelto.md', estado: 'ok', palabras: 600, terminos: 45 }
+      ],
+      dependencias: [],
+      afinidades: [{ a: 0, b: 1, coseno: 0.21 }]
+    };
+
+    return { nodos: nodos, aristas: aristas, comunidad: comunidad,
+             intermediacion: intermediacion, docsPorLema: docsPorLema, capaDocumentos: capaDocumentos };
+  }
+
+  caso('brechas: estructural', 'encuentra el par de territorios que no se hablan', function () {
+    var r = M.grafo.brechas.estructurales(corpusConBrecha(), {});
+    igual(r.lista.length, 1, 'debe salir exactamente la brecha entre clínica y docencia');
+    var b = r.lista[0];
+    igual(b.aristasCruzadas, 1,
+      'el único contacto entre los dos territorios es la arista del concepto puente');
+    afirmar(b.terminosA.indexOf('edema') !== -1 || b.terminosB.indexOf('edema') !== -1, 'falta el lado clínico');
+    afirmar(b.terminosA.indexOf('docencia') !== -1 || b.terminosB.indexOf('docencia') !== -1, 'falta el lado docente');
+  });
+
+  caso('brechas: estructural', 'la densidad interna se compara con el grafo, no con la mediana', function () {
+    // Con dos comunidades, comparar contra la mediana descarta una por
+    // definición. Éste es el caso que lo demostró.
+    var e = corpusConBrecha();
+    var r = M.grafo.brechas.estructurales(e, {});
+    afirmar(r.lista.length > 0, 'la comparación con la mediana dejaba esto en cero');
+    afirmar(r.parametros.densidadGlobal < r.parametros.minimoDensidadInterna + 1e-9,
+      'el mínimo interno parte de la densidad global');
+  });
+
+  caso('brechas: estructural', 'cerca y grande vale más que lejos y marginal', function () {
+    // Tres camarillas: A y B grandes a dos saltos, C marginal a seis.
+    var aristas = [];
+    function camarilla(ids) {
+      for (var i = 0; i < ids.length; i++) for (var j = i + 1; j < ids.length; j++) aristas.push({ a: ids[i], b: ids[j], peso: 3 });
+    }
+    camarilla([0, 1, 2, 3, 4]);          // A, grande
+    camarilla([5, 6, 7, 8, 9]);          // B, grande
+    camarilla([10, 11, 12]);             // C, marginal
+    aristas.push({ a: 4, b: 20, peso: 1 }, { a: 20, b: 5, peso: 1 });               // A—B: dos saltos
+    [21, 22, 23, 24].forEach(function (v, k) {                                       // A—C: cadena larga
+      aristas.push({ a: k === 0 ? 0 : 20 + k, b: v, peso: 1 });
+    });
+    aristas.push({ a: 24, b: 10, peso: 1 });
+
+    var n = 25;
+    var nodos = [], comunidad = [], intermediacion = new Float64Array(n);
+    for (var i = 0; i < n; i++) {
+      nodos.push({ id: i, lema: 'n' + i, forma: 'n' + i, frecuencia: i < 10 ? 30 : (i < 13 ? 4 : 2), docs: 1, rutas: [] });
+      comunidad.push(i < 5 ? 0 : (i < 10 ? 1 : (i < 13 ? 2 : 3)));
+      intermediacion[i] = i === 20 ? 0.9 : 0.1;
+    }
+    var r = M.grafo.brechas.estructurales({
+      nodos: nodos, aristas: aristas, comunidad: comunidad, intermediacion: intermediacion
+    }, { minTamanoComunidad: 3, percentilDensidad: 90 });
+
+    afirmar(r.lista.length >= 2, 'deben evaluarse varios pares, salieron ' + r.lista.length);
+    var ab = r.lista.filter(function (b) {
+      return (b.comunidadA === 0 && b.comunidadB === 1) || (b.comunidadA === 1 && b.comunidadB === 0);
+    })[0];
+    afirmar(ab, 'falta el par de los dos territorios grandes');
+    igual(r.lista[0], ab, 'el par grande y cercano debe encabezar el ranking');
+  });
+
+  caso('brechas: estructural', 'una brecha sin camino se declara, no se puntúa como cercana', function () {
+    var aristas = [];
+    [[0, 1], [0, 2], [1, 2], [3, 4], [3, 5], [4, 5]].forEach(function (p) {
+      aristas.push({ a: p[0], b: p[1], peso: 2 });
+    });
+    var nodos = [], comunidad = [0, 0, 0, 1, 1, 1];
+    for (var i = 0; i < 6; i++) nodos.push({ id: i, lema: 'x' + i, forma: 'x' + i, frecuencia: 10, docs: 1, rutas: [] });
+    var r = M.grafo.brechas.estructurales({
+      nodos: nodos, aristas: aristas, comunidad: comunidad, intermediacion: new Float64Array(6)
+    }, {});
+    igual(r.lista.length, 1);
+    afirmar(r.lista[0].sinCamino === true, 'dos componentes separadas no tienen camino');
+    igual(r.lista[0].distancia, null);
+    afirmar(r.lista[0].facilidad < 0.2, 'sin camino la facilidad debe quedar por debajo de cualquier distancia real');
+  });
+
+  caso('brechas: aislado', 'el umbral de riqueza es relativo al corpus', function () {
+    var capa = {
+      nodos: [
+        { id: 0, ruta: 'a.md', nombre: 'a.md', estado: 'ok', palabras: 100, terminos: 10 },
+        { id: 1, ruta: 'b.md', nombre: 'b.md', estado: 'ok', palabras: 200, terminos: 20 },
+        { id: 2, ruta: 'c.md', nombre: 'c.md', estado: 'ok', palabras: 900, terminos: 90 }
+      ],
+      dependencias: [], afinidades: []
+    };
+    var r = M.grafo.brechas.aislados(capa, {});
+    igual(r.parametros.umbralTerminos, 20, 'la mediana de 10, 20 y 90 es 20');
+    afirmar(r.lista.some(function (d) { return d.ruta === 'c.md'; }), 'el documento denso debe salir');
+    afirmar(!r.lista.some(function (d) { return d.ruta === 'a.md'; }), 'el más pobre del corpus no es un aislado interesante');
+  });
+
+  caso('brechas: aislado', 'un documento enlazado no es un aislado', function () {
+    var capa = {
+      nodos: [
+        { id: 0, ruta: 'a.md', nombre: 'a.md', estado: 'ok', palabras: 500, terminos: 50 },
+        { id: 1, ruta: 'b.md', nombre: 'b.md', estado: 'ok', palabras: 500, terminos: 50 }
+      ],
+      dependencias: [{ a: 0, b: 1, tipo: 'enlace', peso: 1 }], afinidades: []
+    };
+    igual(M.grafo.brechas.aislados(capa, {}).lista.length, 0);
+  });
+
+  caso('brechas: aislado', 'la isla completa pesa más que la que tiene vecinos evidentes', function () {
+    var capa = {
+      nodos: [
+        { id: 0, ruta: 'isla.md', nombre: 'isla.md', estado: 'ok', palabras: 500, terminos: 50 },
+        { id: 1, ruta: 'parecido-a.md', nombre: 'parecido-a.md', estado: 'ok', palabras: 500, terminos: 50 },
+        { id: 2, ruta: 'parecido-b.md', nombre: 'parecido-b.md', estado: 'ok', palabras: 500, terminos: 50 }
+      ],
+      dependencias: [], afinidades: [{ a: 1, b: 2, coseno: 0.6 }]
+    };
+    var r = M.grafo.brechas.aislados(capa, {});
+    igual(r.lista[0].ruta, 'isla.md', 'sin ningún parecido, el aislamiento es más profundo');
+  });
+
+  caso('brechas: puente ausente', 'caza el concepto que toca dos mundos sin juntarlos nunca', function () {
+    var r = M.grafo.brechas.puentesAusentes(corpusConBrecha(), {});
+    igual(r.lista.length, 1);
+    igual(r.lista[0].forma, 'residente');
+    afirmar(r.lista[0].documentosA.length > 0 && r.lista[0].documentosB.length > 0,
+      'debe citar dónde aparece con cada lado');
+  });
+
+  caso('brechas: puente ausente', 'si algún documento sí junta los dos lados, no hay brecha', function () {
+    var e = corpusConBrecha();
+    // Ahora existe un texto donde el puente y ambos lados conviven.
+    e.docsPorLema.get('congestion').add('mixto.md');
+    e.docsPorLema.get('docencia').add('mixto.md');
+    e.docsPorLema.get('residente').add('mixto.md');
+    igual(M.grafo.brechas.puentesAusentes(e, {}).lista.length, 0,
+      'el puente ya está escrito: deja de ser una ausencia');
+  });
+
+  caso('brechas: puente ausente', 'un concepto de un solo documento no puede unir nada', function () {
+    var e = corpusConBrecha();
+    e.docsPorLema.set('residente', new Set(['clinica/a.md']));
+    igual(M.grafo.brechas.puentesAusentes(e, {}).lista.length, 0);
+  });
+
+  caso('brechas', 'el cálculo completo devuelve los tres tipos y sus parámetros', function () {
+    var r = M.grafo.brechas.calcular(corpusConBrecha(), {});
+    igual(r.estructurales.length, 1);
+    afirmar(r.aislados.length >= 1);
+    igual(r.puentesAusentes.length, 1);
+    afirmar(r.estructurales[0].documentosA.length > 0, 'cada lado debe traer sus documentos más cercanos');
+    afirmar(r.parametros.estructurales.corteDensidad != null, 'los parámetros del cálculo deben viajar con el resultado');
+  });
+
+  // -------------------------------------------------------------- preguntas ---
+  caso('preguntas', 'cada brecha produce una pregunta utilizable sin IA', function () {
+    var r = M.grafo.preguntas.poblar(M.grafo.brechas.calcular(corpusConBrecha(), {}));
+    ['estructurales', 'aislados', 'puentesAusentes'].forEach(function (grupo) {
+      r[grupo].forEach(function (b) {
+        afirmar(b.pregunta && b.pregunta.texto.length > 40, 'pregunta demasiado corta en ' + grupo);
+        afirmar(b.pregunta.texto.indexOf('?') !== -1, 'debe ser una pregunta, no un enunciado');
+        afirmar(b.pregunta.texto.indexOf('undefined') === -1, 'plantilla con hueco sin rellenar: ' + b.pregunta.texto);
+        igual(b.pregunta.origen, 'plantilla');
+      });
+    });
+  });
+
+  caso('preguntas', 'la misma brecha da siempre la misma pregunta', function () {
+    var b = {
+      tipo: 'estructural', comunidadA: 0, comunidadB: 1,
+      terminosA: ['edema', 'disnea'], terminosB: ['docencia'],
+      centralA: { forma: 'edema' }, centralB: { forma: 'docencia' },
+      documentosA: [{ ruta: 'a.md' }], documentosB: [{ ruta: 'b.md' }],
+      distancia: 2, sinCamino: false, aristasCruzadas: 1, peso: 0.4
+    };
+    igual(M.grafo.preguntas.para(b).texto, M.grafo.preguntas.para(b).texto,
+      'el deslizador temporal compara instantáneas: la redacción no puede bailar');
+  });
+
+  caso('preguntas', 'una brecha sin camino no presume de cercanía', function () {
+    for (var c = 0; c < 40; c++) {
+      var b = {
+        tipo: 'estructural', comunidadA: c, comunidadB: c + 1,
+        terminosA: ['a' + c], terminosB: ['b' + c],
+        centralA: { forma: 'a' + c }, centralB: { forma: 'b' + c },
+        documentosA: [{ ruta: 'x.md' }], documentosB: [{ ruta: 'y.md' }],
+        distancia: null, sinCamino: true, aristasCruzadas: 0, peso: 0.3
+      };
+      var t = M.grafo.preguntas.para(b).texto;
+      afirmar(t.indexOf('el puente es corto') === -1, 'plantilla incoherente para una brecha sin camino: ' + t);
+    }
+  });
+
+  caso('preguntas', 'la carga para la IA no lleva texto de los documentos', function () {
+    var r = M.grafo.preguntas.poblar(M.grafo.brechas.calcular(corpusConBrecha(), {}));
+    ['estructurales', 'aislados', 'puentesAusentes'].forEach(function (grupo) {
+      r[grupo].forEach(function (b) {
+        var carga = JSON.stringify(b.pregunta.cargaParaIA || {});
+        afirmar(carga.indexOf('texto') === -1, 'la carga no puede incluir texto crudo: ' + carga);
+        afirmar(carga.length < 600, 'la carga debe ser una lista de términos, no un documento');
+      });
+    });
   });
 
   return { casos: casos, afirmar: afirmar, igual: igual, contiene: contiene, noContiene: noContiene };

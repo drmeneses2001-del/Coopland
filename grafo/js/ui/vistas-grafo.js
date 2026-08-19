@@ -214,6 +214,165 @@
       '</tbody>';
   }
 
+
+  // --- brechas -------------------------------------------------------------
+  // Cada tarjeta trae los dos extremos, el peso, los documentos más cercanos a
+  // cada lado y la pregunta. El botón «Tender el puente» la revela; la pregunta
+  // ya está construida por plantilla, así que aparece sin esperar a nada.
+  function chipComunidad(id) {
+    return '<span class="chip" style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' +
+      COL.deComunidad(id) + '"></span>';
+  }
+
+  function terminosChips(lista) {
+    return (lista || []).map(function (t) {
+      return '<span class="concepto"><b>' + esc(t) + '</b></span>';
+    }).join('');
+  }
+
+  function documentosChips(docs) {
+    if (!docs || !docs.length) return '<div>sin documentos propios</div>';
+    return docs.map(function (d) {
+      var ruta = typeof d === 'string' ? d : d.ruta;
+      var extra = (d && d.conceptos) ? ' · ' + d.conceptos : '';
+      return '<div title="' + esc(ruta) + '">' + esc(ruta) + esc(extra) + '</div>';
+    }).join('');
+  }
+
+  function bloquePregunta(b, indice, grupo) {
+    var id = 'preg-' + grupo + '-' + indice;
+    return '<div class="acciones" style="margin-top:10px">' +
+        '<button class="menor" data-pregunta="' + id + '">Tender el puente</button>' +
+      '</div>' +
+      '<div class="pregunta" id="' + id + '" hidden>' +
+        '<p>' + esc(b.pregunta ? b.pregunta.texto : '—') + '</p>' +
+        '<span class="origen">pregunta por plantilla · la capa de IA de la Fase 6 podrá refinarla</span>' +
+      '</div>';
+  }
+
+  function tarjetaEstructural(b, i) {
+    var saltos = b.sinCamino ? 'sin camino' : (b.distancia === 1 ? '1 salto' : b.distancia + ' saltos');
+    return '<div class="brecha">' +
+      '<div class="extremos">' +
+        '<div class="lado">' +
+          '<h5>' + chipComunidad(b.comunidadA) + 'Territorio A · ' + F.numero(b.nodosA) + ' conceptos</h5>' +
+          '<div class="terminos">' + terminosChips(b.terminosA) + '</div>' +
+          '<div class="docs">' + documentosChips(b.documentosA) + '</div>' +
+        '</div>' +
+        '<div class="hueco">' +
+          '<div class="traza"></div>' +
+          '<span class="saltos' + (b.sinCamino ? ' roto' : '') + '">' + esc(saltos) + '</span>' +
+        '</div>' +
+        '<div class="lado">' +
+          '<h5>' + chipComunidad(b.comunidadB) + 'Territorio B · ' + F.numero(b.nodosB) + ' conceptos</h5>' +
+          '<div class="terminos">' + terminosChips(b.terminosB) + '</div>' +
+          '<div class="docs">' + documentosChips(b.documentosB) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="medidas">' +
+        '<span>peso <b>' + (b.peso * 100).toFixed(1) + '%</b></span>' +
+        '<span>facilidad <b>' + b.facilidad.toFixed(2) + '</b></span>' +
+        '<span>puntuación <b>' + b.puntuacion.toFixed(4) + '</b></span>' +
+        '<span>aristas cruzadas <b>' + F.numero(b.aristasCruzadas) + '</b></span>' +
+        '<span>densidad entre <b>' + b.densidadCruzada.toFixed(4) + '</b></span>' +
+      '</div>' +
+      bloquePregunta(b, i, 'est') +
+    '</div>';
+  }
+
+  function tarjetaAislado(b, i) {
+    return '<div class="brecha">' +
+      '<div class="extremos"><div class="lado">' +
+        '<h5>Documento</h5>' +
+        '<div class="docs"><div>' + esc(b.ruta) + '</div></div>' +
+      '</div></div>' +
+      '<div class="medidas">' +
+        '<span>palabras <b>' + F.numero(b.palabras) + '</b></span>' +
+        '<span>conceptos propios <b>' + F.numero(b.terminos) + '</b></span>' +
+        '<span>dependencias <b>0</b></span>' +
+        '<span>afines por vocabulario <b>' + F.numero((b.afines || []).length) + '</b></span>' +
+      '</div>' +
+      ((b.afines && b.afines.length)
+        ? '<div class="medidas" style="border:0;padding-top:0">' + b.afines.map(function (a) {
+            return '<span>' + esc(a.ruta) + ' <b>' + a.coseno.toFixed(2) + '</b></span>';
+          }).join('') + '</div>'
+        : '') +
+      bloquePregunta(b, i, 'ais') +
+    '</div>';
+  }
+
+  function tarjetaPuente(b, i) {
+    return '<div class="brecha">' +
+      '<div class="extremos">' +
+        '<div class="lado">' +
+          '<h5>' + chipComunidad(b.comunidadA) + 'Aparece junto a</h5>' +
+          '<div class="terminos">' + terminosChips(b.vecinosA) + '</div>' +
+          '<div class="docs">' + documentosChips(b.documentosA) + '</div>' +
+        '</div>' +
+        '<div class="hueco">' +
+          '<span class="saltos"><b>' + esc(b.forma) + '</b></span>' +
+          '<div class="traza"></div>' +
+          '<span class="saltos roto">nunca juntos</span>' +
+        '</div>' +
+        '<div class="lado">' +
+          '<h5>' + chipComunidad(b.comunidadB) + 'Y también junto a</h5>' +
+          '<div class="terminos">' + terminosChips(b.vecinosB) + '</div>' +
+          '<div class="docs">' + documentosChips(b.documentosB) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="medidas">' +
+        '<span>frecuencia <b>' + F.numero(b.frecuencia) + '</b></span>' +
+        '<span>intermediación <b>' + b.intermediacion.toFixed(4) + '</b></span>' +
+        '<span>puntuación <b>' + b.puntuacion.toFixed(4) + '</b></span>' +
+      '</div>' +
+      bloquePregunta(b, i, 'pue') +
+    '</div>';
+  }
+
+  function brechas(b) {
+    if (!b) return;
+    $('cifras-brechas').innerHTML = [
+      ['Estructurales', F.numero(b.totales.estructurales), b.totales.estructurales ? 'aviso' : ''],
+      ['Aislados', F.numero(b.totales.aislados), b.totales.aislados ? 'aviso' : ''],
+      ['Puentes ausentes', F.numero(b.totales.puentesAusentes), b.totales.puentesAusentes ? 'aviso' : '']
+    ].map(function (x) {
+      return '<div class="cifra ' + x[2] + '"><b>' + esc(x[1]) + '</b><span>' + esc(x[0]) + '</span></div>';
+    }).join('');
+
+    $('cuenta-estructurales').textContent = F.numero(b.estructurales.length);
+    $('lista-estructurales').innerHTML = b.estructurales.length
+      ? b.estructurales.map(tarjetaEstructural).join('')
+      : '<div class="vacio">Ninguna. O el grafo todavía es pequeño, o tus territorios ya se hablan entre sí.</div>';
+
+    $('cuenta-aislados-brecha').textContent = F.numero(b.totales.aislados) +
+      (b.aislados.length < b.totales.aislados ? ' · se listan ' + b.aislados.length : '');
+    $('lista-aislados-brecha').innerHTML = b.aislados.length
+      ? b.aislados.map(tarjetaAislado).join('')
+      : '<div class="vacio">Ninguno: todos los documentos densos están enlazados con algo.</div>';
+
+    $('cuenta-puentes').textContent = F.numero(b.totales.puentesAusentes);
+    $('lista-puentes').innerHTML = b.puentesAusentes.length
+      ? b.puentesAusentes.map(tarjetaPuente).join('')
+      : '<div class="vacio">Ninguno.</div>';
+
+    var p = b.parametros;
+    var filas = [
+      ['Densidad del grafo completo', p.estructurales.densidadGlobal != null ? p.estructurales.densidadGlobal.toFixed(5) : '—'],
+      ['Mínimo de densidad interna', p.estructurales.minimoDensidadInterna != null ? p.estructurales.minimoDensidadInterna.toFixed(5) : '—'],
+      ['Corte de densidad entre comunidades', p.estructurales.corteDensidad != null ? p.estructurales.corteDensidad.toFixed(5) + ' (percentil ' + p.estructurales.percentil + ')' : '—'],
+      ['Comunidades consideradas', p.estructurales.comunidadesConsideradas != null ? F.numero(p.estructurales.comunidadesConsideradas) : (p.estructurales.motivo || '—')],
+      ['Pares evaluados', p.estructurales.paresEvaluados != null ? F.numero(p.estructurales.paresEvaluados) : '—'],
+      ['Criterio de documento aislado', p.aislados.criterio || p.aislados.motivo || '—'],
+      ['Conceptos revisados como puente', p.puentesAusentes.revisados != null ? F.numero(p.puentesAusentes.revisados) : (p.puentesAusentes.motivo || '—')]
+    ];
+    $('tabla-parametros-brechas').innerHTML = '<tbody>' + filas.map(function (f) {
+      return '<tr><td>' + esc(f[0]) + '</td><td class="ruta">' + esc(f[1]) + '</td></tr>';
+    }).join('') + '</tbody>';
+
+    $('bi-brechas').textContent = F.numero(
+      b.totales.estructurales + b.totales.aislados + b.totales.puentesAusentes);
+  }
+
   function barra(r) {
     $('bi-grafo-nodos').textContent = F.numero(r.conceptos.nodos);
     $('bi-comunidades').textContent = F.numero(r.conceptos.comunidades);
@@ -232,11 +391,12 @@
     documentos(resumen.documentos);
     afinidades(resumen.documentos.afinidades, opciones.umbral != null ? opciones.umbral : resumen.documentos.totales.sueloAfinidad);
     mixta(resumen.mixta, opciones.huerfanos, resumen.documentos.totales.documentos);
+    brechas(resumen.brechas);
     barra(resumen);
   }
 
   function capaVisible(nombre) {
-    ['conceptos', 'documentos', 'mixta'].forEach(function (c) {
+    ['conceptos', 'documentos', 'mixta', 'brechas'].forEach(function (c) {
       $('capa-' + c).hidden = (c !== nombre);
     });
     Array.prototype.forEach.call(document.querySelectorAll('#conmutador-capas button'), function (b) {
@@ -245,7 +405,7 @@
   }
 
   return {
-    progreso: progreso, pintar: pintar, afinidades: afinidades, capaVisible: capaVisible,
+    progreso: progreso, pintar: pintar, afinidades: afinidades, brechas: brechas, capaVisible: capaVisible,
     ultimo: function () { return ultimo; }
   };
 });

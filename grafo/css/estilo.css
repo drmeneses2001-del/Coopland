@@ -250,3 +250,34 @@ details.plegable > div { padding: 0 12px 12px; }
 .arista-tipo.enlace::before { border-color: var(--ok); }
 .arista-tipo.version::before { border-color: var(--activo); }
 .arista-tipo.referencia::before { border-color: var(--aviso); }
+
+/* --- Fase 4: brechas ------------------------------------------------------ */
+
+/* Tarjeta de brecha. Los dos extremos, el peso y la pregunta. La jerarquía es
+   deliberada: primero qué territorios son, después cuánto vale cruzarlos, y la
+   pregunta al final, que es lo único que el usuario se lleva. */
+.brecha { border: 1px solid var(--linea); border-radius: var(--radio); background: var(--fondo-alto); padding: 12px; margin-top: 10px; }
+.brecha .extremos { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+.brecha .lado { flex: 1 1 200px; min-width: 0; }
+.brecha .lado h5 { margin: 0 0 5px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texto-tenue); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.brecha .lado .terminos { display: flex; flex-wrap: wrap; gap: 4px; }
+.brecha .lado .docs { margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--texto-tenue); }
+.brecha .lado .docs div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* El hueco entre los dos lados es el dibujo del propio dato: cuanto más lejos
+   están, más largo el trazo, y el trazo es punteado porque el puente no existe. */
+.brecha .hueco { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 74px; padding: 0 4px; }
+.brecha .hueco .traza { width: 100%; border-top: 2px dotted var(--linea-fuerte); margin: 4px 0; }
+.brecha .hueco .saltos { font-family: var(--mono); font-size: 11px; color: var(--texto-medio); white-space: nowrap; }
+.brecha .hueco .saltos.roto { color: var(--fallo); }
+
+.brecha .medidas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--linea); font-family: var(--mono); font-size: 11.5px; color: var(--texto-tenue); }
+.brecha .medidas b { color: var(--texto-medio); font-weight: 500; }
+
+.brecha .pregunta { margin-top: 10px; padding: 10px; border-left: 2px solid var(--activo); background: var(--fondo-hundido); border-radius: 0 var(--radio) var(--radio) 0; }
+.brecha .pregunta p { margin: 0; font-size: 14px; line-height: 1.5; }
+.brecha .pregunta .origen { display: block; margin-top: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--texto-tenue); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.grupo-brechas > h3 { font-size: 13px; font-weight: 600; margin: 22px 0 2px; display: flex; align-items: center; gap: 8px; }
+.grupo-brechas > h3 .cuenta { font-family: var(--mono); font-size: 11.5px; color: var(--texto-tenue); font-weight: 400; }
+.grupo-brechas > p.nota { margin-top: 4px; }

@@ -436,6 +436,16 @@
     V.inventario(estado.indice.docs, this.value);
   });
   $('btn-construir-grafo').addEventListener('click', function () { construirGrafo(false); });
+  // «Tender el puente»: la pregunta ya viene calculada por plantilla, así que
+  // el botón la revela en el sitio en lugar de abrir nada.
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('button[data-pregunta]');
+    if (!b) return;
+    var caja = document.getElementById(b.dataset.pregunta);
+    if (!caja) return;
+    caja.hidden = !caja.hidden;
+    b.textContent = caja.hidden ? 'Tender el puente' : 'Ocultar la pregunta';
+  });
   $('conmutador-capas').addEventListener('click', function (ev) {
     var b = ev.target.closest('button[data-capa]');
     if (!b) return;

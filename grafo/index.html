@@ -131,6 +131,7 @@
         <button role="tab" aria-selected="true" data-capa="conceptos">Conceptos</button>
         <button role="tab" aria-selected="false" data-capa="documentos">Documentos</button>
         <button role="tab" aria-selected="false" data-capa="mixta">Mixta</button>
+        <button role="tab" aria-selected="false" data-capa="brechas">Brechas</button>
       </div>
 
       <!-- capa de conceptos -->
@@ -227,6 +228,52 @@
           <div class="desplaza"><table class="datos" id="tabla-huerfanos"></table></div>
         </section>
       </div>
+
+      <!-- brechas -->
+      <div class="capa" id="capa-brechas" hidden>
+        <div class="cifras" id="cifras-brechas"></div>
+        <p class="nota" style="margin-top:12px">
+          Una brecha no es «dos cosas que no se tocan»: en un grafo grande eso son
+          millones de pares y ninguno significa nada. Aquí una brecha es una
+          ausencia estructuralmente improbable, y de cada una sale una pregunta
+          que puedes llevarte tal cual.
+        </p>
+
+        <div class="grupo-brechas">
+          <h3>Brechas estructurales <span class="cuenta" id="cuenta-estructurales"></span></h3>
+          <p class="nota">
+            Pares de comunidades densas por dentro y casi sin aristas entre sí.
+            Ordenadas por <b>peso × facilidad de puente</b>: una brecha entre dos
+            territorios grandes separados por dos saltos vale más que una entre
+            dos marginales separados por seis.
+          </p>
+          <div id="lista-estructurales"></div>
+        </div>
+
+        <div class="grupo-brechas">
+          <h3>Documentos aislados <span class="cuenta" id="cuenta-aislados-brecha"></span></h3>
+          <p class="nota">
+            Muchos conceptos propios, ninguna dependencia explícita. Es la firma
+            del texto que escribiste y nunca volviste a conectar con nada.
+          </p>
+          <div id="lista-aislados-brecha"></div>
+        </div>
+
+        <div class="grupo-brechas">
+          <h3>Conceptos puente ausentes <span class="cuenta" id="cuenta-puentes"></span></h3>
+          <p class="nota">
+            Un término que vive con dos comunidades distintas, pero al que ningún
+            documento junta con ambas a la vez. El puente existe en el agregado
+            del archivo y no existe en ningún texto concreto.
+          </p>
+          <div id="lista-puentes"></div>
+        </div>
+
+        <details class="plegable">
+          <summary>Cómo se calcularon</summary>
+          <div class="desplaza"><table class="datos" id="tabla-parametros-brechas"></table></div>
+        </details>
+      </div>
     </div>
   </section>
 
@@ -282,7 +329,8 @@
   <span>último índice <b id="bi-duracion">—</b></span><span class="sep">│</span>
   <span>conceptos en grafo <b id="bi-grafo-nodos">—</b></span><span class="sep">│</span>
   <span>comunidades <b id="bi-comunidades">—</b></span><span class="sep">│</span>
-  <span>modularidad <b id="bi-modularidad">—</b></span>
+  <span>modularidad <b id="bi-modularidad">—</b></span><span class="sep">│</span>
+  <span>brechas <b id="bi-brechas">—</b></span>
 </div>
 
 <script src="js/nucleo/hash.js"></script>
@@ -301,6 +349,8 @@
 <script src="js/grafo/metricas.js"></script>
 <script src="js/grafo/documentos.js"></script>
 <script src="js/grafo/mixta.js"></script>
+<script src="js/grafo/brechas.js"></script>
+<script src="js/grafo/preguntas.js"></script>
 <script src="js/ui/formato.js"></script>
 <script src="js/ui/colores.js"></script>
 <script src="js/ui/vistas.js"></script>

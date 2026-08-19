@@ -15,7 +15,9 @@ importScripts(
   '../grafo/louvain.js',
   '../grafo/metricas.js',
   '../grafo/documentos.js',
-  '../grafo/mixta.js'
+  '../grafo/mixta.js',
+  '../grafo/brechas.js',
+  '../grafo/preguntas.js'
 );
 
 var GC = self.GC;
@@ -114,6 +116,22 @@ async function construir(id, opciones) {
     terminosPorDocumento: opciones.terminosPorDocumento || 12
   });
 
+  // --- brechas -------------------------------------------------------------
+  progreso(id, 'buscando brechas', 0, 1);
+  var brechas = GC.grafo.brechas.calcular({
+    nodos: conceptos.nodos,
+    aristas: conceptos.aristas,
+    comunidad: comunidades.comunidad,
+    intermediacion: inter.normal,
+    docsPorLema: acumulador.indiceDocumentos(),
+    capaDocumentos: capaDocs
+  }, {
+    percentilDensidad: opciones.percentilDensidad,
+    minTamanoComunidad: opciones.minTamanoComunidad,
+    maxBrechas: opciones.maxBrechas
+  });
+  GC.grafo.preguntas.poblar(brechas);
+
   // --- persistencia --------------------------------------------------------
   progreso(id, 'guardando', 0, 1);
   var registro = {
@@ -131,7 +149,8 @@ async function construir(id, opciones) {
       corte: conceptos.corte
     },
     documentos: capaDocs,
-    mixta: capaMixta
+    mixta: capaMixta,
+    brechas: brechas
   };
   await GC.almacen.guardarLote('grafo', [registro]);
 
@@ -167,9 +186,10 @@ async function construir(id, opciones) {
         return { desde: capaDocs.nodos[e.a].ruta, hasta: capaDocs.nodos[e.b].ruta, coseno: e.coseno };
       }),
       sinResolver: capaDocs.sinResolver.slice(0, 40),
-      aislados: aislar(capaDocs)
+      aislados: aislar(capaDocs)   // conteo rápido para la capa de documentos
     },
-    mixta: capaMixta.totales
+    mixta: capaMixta.totales,
+    brechas: brechas
   };
 
   responder({ t: 'grafo-listo', id: id, resumen: resumen, instantanea: serializarParaInstantanea(conceptos, comunidades, inter, capaDocs) });
