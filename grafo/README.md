@@ -4,9 +4,8 @@ Aplicación web local, sin servidor y sin conexión, que convierte una carpeta d
 documentos en un grafo de conocimiento navegable. Pensada para un iPad Pro con
 Safari, con documentos en español e inglés mezclados.
 
-**Estado: fases 1 y 2 terminadas y validadas.** La visualización (fase 3 en
-adelante) todavía no existe; el orden de entrega acordado es validar la ingesta
-y el índice antes de tocar el grafo.
+**Estado: fases 1, 2 y 3 terminadas y validadas.** El grafo y sus métricas ya
+existen y se muestran en paneles; el lienzo interactivo llega en la fase 5.
 
 ---
 
@@ -16,7 +15,7 @@ y el índice antes de tocar el grafo.
 |---|---|---|
 | 1 | Ingesta por tres rutas, parsers modulares, extracción en Web Workers | terminada |
 | 2 | Índice persistente e incremental en IndexedDB, diff, panel «Qué cambió», instantáneas | terminada |
-| 3 | Grafo de tres capas (conceptos, documentos, mixta) | pendiente |
+| 3 | Grafo de tres capas (conceptos, documentos, mixta), comunidades, intermediación, diversidad temática | terminada |
 | 4 | Brechas estructurales, documentos aislados, conceptos puente ausentes | pendiente |
 | 5 | Lienzo, panel lateral, deslizador temporal | pendiente |
 | 6 | Capa de IA opcional | pendiente |
@@ -43,15 +42,18 @@ el panel de entorno en vez de fallar en silencio.
 ## Pruebas
 
 ```sh
-node grafo/pruebas/nodo.js        # 31 pruebas: lógica pura y todos los parsers
+node grafo/pruebas/nodo.js        # 57 pruebas: lógica pura, parsers y grafo
 ```
 
-Y en el propio iPad, `grafo/pruebas/index.html`, que ejecuta las mismas 31 más
-7 que sólo existen en el navegador: arranque de los workers con sus tres
+Y en el propio iPad, `grafo/pruebas/index.html`, que ejecuta las mismas 57 más
+10 que sólo existen en el navegador: arranque de los workers con sus tres
 bibliotecas, PDF de principio a fin dentro del worker, salto por hash idéntico,
 descompresión de ZIP con jerarquía, almacén IndexedDB, ciclo completo de
-indexación incremental (alta, sin cambios, modificación, baja) y el arranque por
-debajo de 2 s.
+indexación incremental (alta, sin cambios, modificación, baja), construcción de
+las tres capas del grafo desde el índice y el arranque por debajo de 2 s.
+
+El corredor del navegador usa **su propia base de datos**
+(`grafo-conocimiento-pruebas`): ejecutar las pruebas no toca el índice real.
 
 ---
 
@@ -77,6 +79,13 @@ de verdad llegan rutas relativas. El resultado se guarda, así que a partir de l
 segunda apertura la app conoce la verdad de *ese* dispositivo. Una verificación
 fallida degrada la ruta permanentemente y la app pasa a la siguiente.
 
+> **Resultado en el dispositivo real** (iPad Pro, Safari de iPadOS, agosto de
+> 2026): la ruta B **funciona**. El selector devuelve los archivos con su
+> `webkitRelativePath`, de modo que la jerarquía de carpetas se conserva entre
+> sesiones. Queda resuelta la contradicción de las fuentes en favor de MDN. La
+> ruta A (`showDirectoryPicker`) sigue sin existir en Safari, así que el
+> re-escaneo exige volver a elegir la carpeta; el diff y el re-parseo, no.
+
 ---
 
 ## Arquitectura
@@ -100,9 +109,16 @@ grafo/
     ingesta/
       capacidades.js    sondeo de rutas y del entorno
       ingesta.js        recorrido de carpeta, <input>, ZIP
+    grafo/
+      coocurrencia.js   capa de conceptos: ventana deslizante y pesos
+      louvain.js        comunidades y modularidad
+      metricas.js       intermediación (Brandes), grados, componentes
+      documentos.js     dependencias explícitas y afinidad TF-IDF
+      mixta.js          pertenencia entre documentos y conceptos
     parsers/            un módulo por formato + registro enrutador
     trabajadores/
       extractor.js      worker clásico: lee, descomprime, analiza, tokeniza
+      grafista.js       worker del grafo: arma las tres capas y las guarda
     ui/                 formato y vistas
   pruebas/              corredores de Node y de navegador + archivos de muestra
   vendor/               pdf.js 3.11 · mammoth 1.9 · fflate 0.8 (empaquetados)
@@ -179,6 +195,95 @@ salieron de pruebas que fallaron:
   son raros (*mes, gas*) y los nombres en `-se` son constantes (*fase, base,
   clase, frase*); incluirla arruinaba más palabras de las que arreglaba.
 
+
+---
+
+## La fase 3: cómo se construye el grafo
+
+### Capa de conceptos
+
+Ventana deslizante de **cuatro tokens** sobre el flujo ya lematizado y sin
+palabras vacías. Cada par dentro de la ventana suma peso, y el par que ocurre
+**dentro de la misma oración pesa 1.0 frente al 0.4** del que cruza un punto:
+una frase es una afirmación, un salto de oración es sólo vecindad.
+
+Las métricas y su papel:
+
+| Métrica | Algoritmo | Para qué |
+|---|---|---|
+| Grado | suma de pesos incidentes | vecindad inmediata |
+| Intermediación *(betweenness)* | Brandes sin pesos | **tamaño** del nodo |
+| Comunidades | Louvain ponderado | **color** del nodo |
+| Modularidad | Q de la partición final | diversidad temática |
+
+Ambos algoritmos están validados contra un caso con respuesta publicada, el club
+de kárate de Zachary: Louvain devuelve **cuatro comunidades con Q = 0.4188** y
+Brandes da **231.07** para el nodo 0 y **160.55** para el 33. No son cifras
+inventadas para que la prueba pase; son las que aparecen en la literatura.
+
+**Los puntos conectores del discurso** son la razón intermediación/frecuencia:
+conceptos que sostienen el puente sin ser los protagonistas. Es la lista que
+ningún recuento de frecuencia puede producir, y suele ser lo más interesante del
+grafo.
+
+**Intermediación exacta o aproximada.** Hasta 1200 nodos, Brandes completo. Por
+encima, muestreo de 400 pivotes con un generador de azar de semilla fija —
+reproducible a propósito: si el muestreo variara entre aperturas, el deslizador
+temporal mostraría cambios que nadie escribió. El panel dice siempre cuál de las
+dos se usó.
+
+### Capa de documentos: dependencia contra afinidad
+
+La distinción es el argumento entero de esta capa, y la diferencia entre un mapa
+y una nube de palabras:
+
+- **Dependencia** (línea sólida): alguien escribió el enlace. Wikilinks
+  `[[ ]]`, enlaces markdown relativos, rutas citadas en el texto, referencias
+  bibliográficas repetidas (DOI y pares autor-año, exigiendo **dos o más**
+  coincidencias) y secuencias de versión detectadas por el nombre
+  (`v1`/`v2`, `borrador`/`final`, `(1)`, sellos de fecha).
+- **Afinidad** (línea punteada): coseno TF-IDF sobre umbral ajustable en vivo.
+  Los términos presentes en más de la mitad del corpus se descartan: su idf es
+  casi cero y sólo aportan coste.
+
+Cuando un wikilink apunta a dos documentos con el mismo nombre, **se declara
+ambiguo y no se dibuja nada**. Los enlaces sin destino se listan en su propio
+panel en vez de desaparecer.
+
+### Trazabilidad
+
+Cada arista de conceptos guarda hasta tres **oraciones de origen** con su
+documento y su índice de oración. Es el material con el que la fase 5 abrirá el
+documento y subrayará la línea exacta que produjo la conexión, en vez de pedirle
+al usuario que le crea al panel.
+
+### El color de las comunidades
+
+Rueda **OKLCH** recorrida por el ángulo áureo (137.5°), no una paleta fija: con
+doce clústeres una paleta se repite, y dos comunidades consecutivas —que en el
+grafo suelen ser vecinas— caerían en tonos contiguos. Todos los tonos comparten
+luminosidad percibida, así que ninguno grita más que otro sobre el lienzo
+oscuro. Hay respaldo a sRGB calculado por OKLab para navegadores sin `oklch()`.
+
+### Dos decisiones de calidad que salieron de mirar la salida real
+
+**Los verbos de discurso se filtran.** En la primera ejecución sobre un corpus
+de prueba, los conceptos más «influyentes» eran *exige* y *depende*. Son el
+andamio con el que se escribe cualquier texto académico, aparecen en todas
+partes y conectan todo con todo, de modo que encabezan la intermediación y tapan
+lo que de verdad une el corpus. `vacias.js` enumera ahora esas formas — formas
+reales, no un patrón morfológico, que se llevaría por delante sustantivos
+legítimos. Quedan fuera a propósito las que también son sustantivos médicos:
+*muestra, resultado, estado, mejora, control*. Al filtrarlas, la modularidad del
+corpus de prueba subió de 0.488 a 0.540 y las comunidades pasaron a llamarse
+*edema · cardiaca · insuficiencia* en vez de *exige · residente · depende*.
+
+**«Rico en contenido» es relativo al corpus.** El umbral para declarar aislado a
+un documento era un número fijo de palabras, y un número fijo declara aislado a
+medio archivo de notas breves y a ninguno de un archivo de artículos. Ahora el
+listón es la **mediana de términos propios del propio corpus**, y el panel
+muestra qué umbral se usó.
+
 ---
 
 ## Privacidad
@@ -194,9 +299,18 @@ realizarlo.
 
 ## Lo que falta y por qué
 
-El panel «Qué cambió» declara dos filas como **pendientes de fase** en lugar de
-rellenarlas: los clústeres fusionados o partidos necesitan la capa de conceptos
-(fase 3) y las brechas cerradas necesitan el cálculo de brechas (fase 4). Las
-instantáneas ya se guardan con un campo `grafo: null` reservado para cuando ese
-cálculo exista, de modo que el deslizador temporal de la fase 5 tenga historia
-desde el primer día en lugar de empezar vacío.
+El panel «Qué cambió» sigue declarando **pendientes de fase** los clústeres
+fusionados o partidos y las brechas cerradas: lo primero exige comparar dos
+particiones de Louvain entre instantáneas, lo segundo necesita el cálculo de
+brechas de la fase 4. Ninguna de las dos se rellena con conjeturas.
+
+Las instantáneas ya guardan el grafo serializado —hasta 500 nodos con su
+comunidad e intermediación, y hasta 2500 aristas—, así que el deslizador
+temporal de la fase 5 tendrá historia desde el primer día en lugar de empezar
+vacío.
+
+El grafo se reconstruye entero en cada indexación, no de forma incremental. Con
+los corpus medidos cuesta decenas de milisegundos y la corrección está
+garantizada; si un archivo real lo vuelve lento, el punto donde atacarlo es
+`grafista.js`, guardando las parejas de co-ocurrencia por documento para poder
+sumarlas en vez de re-tokenizar.

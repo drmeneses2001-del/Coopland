@@ -32,13 +32,66 @@
   var RUIDO = ('http https www com org html pdf docx doc txt md rtf csv json png jpg jpeg fig tab pag pp vol num nro ref ' +
     'copyright reservados derechos all rights reserved page').split(/\s+/);
 
+
+  // Verbos de discurso: el andamio con el que se escribe cualquier texto
+  // académico o clínico. No son conceptos, pero se comportan como si lo fueran
+  // —aparecen en todas partes y conectan todo con todo—, así que sin esta lista
+  // acaban encabezando la intermediación y tapando lo que de verdad une el
+  // corpus. Se enumeran las formas reales, no un patrón: una regla morfológica
+  // se llevaría por delante sustantivos legítimos.
+  //
+  // Quedan FUERA a propósito las formas que también son sustantivos comunes en
+  // medicina: «muestra», «resultado», «estado», «mejora», «cuenta», «control».
+  var VERBOS_ES = (
+    'exige exigen exigir exigido depende dependen depender dependiendo ' +
+    'produce producen producir producido produjo produjeron ' +
+    'responde responden responder respondido eleva elevan elevar elevado ' +
+    'permite permiten permitir permitido incluye incluyen incluir incluido ' +
+    'presenta presentan presentar presentado presentaba muestran mostrar mostrado ' +
+    'indica indican indicar indicado senala senalan senalar senalado ' +
+    'considera consideran considerar considerado realiza realizan realizar realizado ' +
+    'obtiene obtienen obtener obtenido observa observan observar observado ' +
+    'encuentra encuentran encontrar encontrado describe describen describir descrito ' +
+    'define definen definir definido requiere requieren requerir requerido ' +
+    'existe existen existir ocurre ocurren ocurrir ocurrido ' +
+    'aparece aparecen aparecer aparecido resulta resultan resultar ' +
+    'supone suponen suponer lleva llevan llevar implica implican implicar ' +
+    'determina determinan determinar genera generan generar ' +
+    'utiliza utilizan utilizar utilizado emplea emplean emplear empleado ' +
+    'consiste consisten consistir corresponde corresponden corresponder ' +
+    'constituye constituyen constituir representa representan representar ' +
+    'mejoran mejorar mejorado aumenta aumentan aumentar ' +
+    'disminuye disminuyen disminuir mantiene mantienen mantener ' +
+    'recibe reciben recibir recibido evalua evaluan evaluar evaluado ' +
+    'compara comparan comparar analiza analizan analizar ' +
+    'discute discuten discutir discutido concluye concluyen concluir ' +
+    'sugiere sugieren sugerir propone proponen proponer ' +
+    'plantea plantean plantear destaca destacan destacar ' +
+    'sigue siguen seguir seguido puede pueden poder podria podrian pudo pudieron ' +
+    'debe deben deber deberia deberian tiene tienen tener tenia tenido ' +
+    'hace hacen hacer dice dicen decir dicho van ' +
+    'permite conlleva conllevan implicar acompana acompanan acompanar'
+  ).split(/\s+/);
+
+  // En inglés el lematizador ya reduce a la forma base, así que basta con ella.
+  var VERBOS_EN = (
+    'require show present indicate suggest describe define include provide ' +
+    'obtain observe find occur appear involve determine generate use employ ' +
+    'consist correspond constitute represent improve increase decrease ' +
+    'maintain receive evaluate compare analyze analyse discuss conclude ' +
+    'propose highlight follow need make take give get become remain allow ' +
+    'enable report note consider assess examine investigate demonstrate support'
+  ).split(/\s+/);
+
   function conjuntoBase() {
     var s = new Set();
     ES.forEach(function (w) { s.add(w); });
     EN.forEach(function (w) { s.add(w); });
     RUIDO.forEach(function (w) { s.add(w); });
+    VERBOS_ES.forEach(function (w) { s.add(w); });
+    VERBOS_EN.forEach(function (w) { s.add(w); });
     return s;
   }
 
-  return { ES: ES, EN: EN, RUIDO: RUIDO, conjuntoBase: conjuntoBase };
+  return { ES: ES, EN: EN, RUIDO: RUIDO, VERBOS_ES: VERBOS_ES, VERBOS_EN: VERBOS_EN, conjuntoBase: conjuntoBase };
 });

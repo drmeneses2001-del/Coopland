@@ -19,6 +19,19 @@
   var VERSION_BD = 1;
   var bd = null;
 
+  // El corredor de pruebas vive en el mismo origen que la aplicación y, por
+  // tanto, compartiría su base de datos: ejecutar las pruebas ensuciaría el
+  // índice real con documentos y grafos de mentira. Cambiar de base al arrancar
+  // es lo que mantiene separadas ambas cosas.
+  function usarBaseDeDatos(nombre) {
+    if (nombre === NOMBRE_BD) return NOMBRE_BD;
+    if (bd) { bd.close(); bd = null; }
+    NOMBRE_BD = nombre;
+    return NOMBRE_BD;
+  }
+
+  function baseActual() { return NOMBRE_BD; }
+
   function promesa(peticion) {
     return new Promise(function (resolver, rechazar) {
       peticion.onsuccess = function () { resolver(peticion.result); };
@@ -67,6 +80,26 @@
   async function leer(almacen, clave) {
     var tx = await transaccion([almacen], 'readonly');
     return promesa(tx.objectStore(almacen).get(clave));
+  }
+
+  // Recorrido por cursor: el grafo se construye leyendo miles de documentos con
+  // su texto, y cargarlos todos de golpe en memoria tumbaría el iPad. El cursor
+  // entrega uno a uno y deja que el consumidor se quede sólo con lo que necesita.
+  async function recorrer(almacen, alRegistro) {
+    var b = await abrir();
+    return new Promise(function (resolver, rechazar) {
+      var tx = b.transaction([almacen], 'readonly');
+      var pet = tx.objectStore(almacen).openCursor();
+      var n = 0;
+      pet.onsuccess = function () {
+        var cursor = pet.result;
+        if (!cursor) { resolver(n); return; }
+        n++;
+        try { alRegistro(cursor.value, n); } catch (e) { rechazar(e); return; }
+        cursor.continue();
+      };
+      pet.onerror = function () { rechazar(pet.error); };
+    });
   }
 
   async function contar(almacen) {
@@ -160,7 +193,8 @@
 
   return {
     NOMBRE_BD: NOMBRE_BD, VERSION_BD: VERSION_BD,
-    abrir: abrir, leer: leer, leerTodos: leerTodos, contar: contar,
+    usarBaseDeDatos: usarBaseDeDatos, baseActual: baseActual,
+    abrir: abrir, leer: leer, leerTodos: leerTodos, recorrer: recorrer, contar: contar,
     guardarLote: guardarLote, borrarLote: borrarLote, vaciar: vaciar,
     config: config, guardarInstantanea: guardarInstantanea,
     listarInstantaneas: listarInstantaneas, podarInstantaneas: podarInstantaneas,

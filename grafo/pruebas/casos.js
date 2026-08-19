@@ -9,6 +9,14 @@
       diff: require('../js/nucleo/diff.js'),
       indice: require('../js/nucleo/indice.js'),
       registro: require('../js/parsers/registro.js'),
+      grafo: {
+        coocurrencia: require('../js/grafo/coocurrencia.js'),
+        louvain: require('../js/grafo/louvain.js'),
+        metricas: require('../js/grafo/metricas.js'),
+        documentos: require('../js/grafo/documentos.js'),
+        mixta: require('../js/grafo/mixta.js')
+      },
+      colores: require('../js/ui/colores.js'),
       parsers: {
         texto: require('../js/parsers/texto.js'),
         rtf: require('../js/parsers/rtf.js'),
@@ -23,7 +31,8 @@
     mods = {
       hash: raiz.GC.hash, bytes: raiz.GC.bytes, vacias: raiz.GC.vacias,
       terminos: raiz.GC.terminos, diff: raiz.GC.diff, indice: raiz.GC.indice,
-      registro: raiz.GC.registro, parsers: raiz.GC.parsers
+      registro: raiz.GC.registro, parsers: raiz.GC.parsers,
+      grafo: raiz.GC.grafo, colores: raiz.GC.ui.colores
     };
   }
   var api = fabrica(mods);
@@ -374,6 +383,335 @@
     });
     afirmar(p.texto === undefined, 'el índice ligero no puede llevar texto');
     igual(p.nTerminos, 1);
+  });
+
+
+  // ============================ Fase 3: el grafo ============================
+
+  var KARATE = ('0 1,0 2,0 3,0 4,0 5,0 6,0 7,0 8,0 10,0 11,0 12,0 13,0 17,0 19,0 21,0 31,1 2,1 3,1 7,1 13,' +
+    '1 17,1 19,1 21,1 30,2 3,2 7,2 8,2 9,2 13,2 27,2 28,2 32,3 7,3 12,3 13,4 6,4 10,5 6,5 10,5 16,6 16,' +
+    '8 30,8 32,8 33,9 33,13 33,14 32,14 33,15 32,15 33,18 32,18 33,19 33,20 32,20 33,22 32,22 33,23 25,' +
+    '23 27,23 29,23 32,23 33,24 25,24 27,24 31,25 31,26 29,26 33,27 33,28 31,28 33,29 32,29 33,30 32,' +
+    '30 33,31 32,31 33,32 33').split(',').map(function (par) {
+      var p = par.trim().split(' ');
+      return { a: +p[0], b: +p[1], peso: 1 };
+    });
+
+  // ------------------------------------------------------- co-ocurrencia ---
+  caso('grafo: co-ocurrencia', 'la ventana de 4 conecta lo que está cerca y nada más', function () {
+    var a = M.grafo.coocurrencia.crear();
+    // Seis lemas seguidos en una sola oración.
+    var tokens = ['uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis'].map(function (l, i) {
+      return { lema: l, forma: l, oracion: 0, desde: i, hasta: i + 1 };
+    });
+    a.agregar('x.md', tokens);
+    var g = a.construir({ minFrecuencia: 1, minPeso: 0.1 });
+    var indice = {}; g.nodos.forEach(function (n) { indice[n.lema] = n.id; });
+    function hay(x, y) {
+      return g.aristas.some(function (e) {
+        return (e.a === indice[x] && e.b === indice[y]) || (e.a === indice[y] && e.b === indice[x]);
+      });
+    }
+    afirmar(hay('uno', 'dos'), 'vecinos inmediatos');
+    afirmar(hay('uno', 'tres'), 'dentro de la ventana');
+    afirmar(hay('uno', 'cuatro'), 'la ventana de 4 abarca las posiciones i..i+3');
+    afirmar(hay('uno', 'cinco') === false, 'la quinta posición ya cae fuera de la ventana');
+    afirmar(hay('dos', 'cinco'), 'la ventana se desliza: desde «dos» sí se alcanza «cinco»');
+  });
+
+  caso('grafo: co-ocurrencia', 'la misma oración pesa más que cruzar un punto', function () {
+    var dentro = M.grafo.coocurrencia.crear();
+    dentro.agregar('a.md', [
+      { lema: 'alfa', forma: 'alfa', oracion: 0 }, { lema: 'beta', forma: 'beta', oracion: 0 }
+    ]);
+    var fuera = M.grafo.coocurrencia.crear();
+    fuera.agregar('b.md', [
+      { lema: 'alfa', forma: 'alfa', oracion: 0 }, { lema: 'beta', forma: 'beta', oracion: 1 }
+    ]);
+    var pesoDentro = dentro.construir({ minFrecuencia: 1, minPeso: 0 }).aristas[0].peso;
+    var pesoFuera = fuera.construir({ minFrecuencia: 1, minPeso: 0 }).aristas[0].peso;
+    afirmar(pesoDentro > pesoFuera, 'la arista intraoración debe pesar más: ' + pesoDentro + ' vs ' + pesoFuera);
+    igual(pesoDentro, M.grafo.coocurrencia.PESO_MISMA_ORACION);
+  });
+
+  caso('grafo: co-ocurrencia', 'cada arista guarda de dónde salió', function () {
+    var a = M.grafo.coocurrencia.crear();
+    a.agregar('clinica/notas.md', M.terminos.tokenizar('La disnea acompaña al edema pulmonar.').tokens);
+    var g = a.construir({ minFrecuencia: 1, minPeso: 0 });
+    afirmar(g.aristas.length > 0, 'debe haber aristas');
+    var m = g.aristas[0].muestras[0];
+    igual(m.ruta, 'clinica/notas.md', 'la muestra debe apuntar al documento de origen');
+    afirmar(typeof m.oracion === 'number', 'y al índice de oración, que es lo que permite subrayarla');
+  });
+
+  caso('grafo: co-ocurrencia', 'el corte informa de lo que deja fuera', function () {
+    var a = M.grafo.coocurrencia.crear();
+    a.agregar('a.md', M.terminos.tokenizar('alfa beta gamma delta epsilon zeta eta theta iota kappa').tokens);
+    var g = a.construir({ maxNodos: 3, minFrecuencia: 1, minPeso: 0 });
+    igual(g.nodos.length, 3, 'el tope de nodos debe respetarse');
+    afirmar(g.totales.nodosDescartados > 0, 'y lo descartado debe contarse');
+    afirmar(g.totales.aristasDescartadas > 0, 'igual que las aristas que se quedan sin extremo');
+  });
+
+  caso('grafo: co-ocurrencia', 'un archivo sin texto entra por sus términos de ruta', function () {
+    var a = M.grafo.coocurrencia.crear();
+    a.agregarRuta('estudios/ecocardiograma-basal.png', M.terminos.terminosDeRuta('estudios/ecocardiograma-basal.png'));
+    var g = a.construir({ minFrecuencia: 1, minPeso: 0 });
+    var lemas = g.nodos.map(function (n) { return n.lema; });
+    afirmar(lemas.indexOf('ecocardiograma') !== -1, 'el huérfano aporta sus conceptos de nombre');
+    afirmar(g.aristas.length > 0, 'y quedan conectados entre sí, no como polvo suelto');
+    igual(g.aristas[0].peso, M.grafo.coocurrencia.PESO_ENTRE_ORACIONES,
+      'sin oraciones, la ruta conecta con el peso débil');
+  });
+
+  caso('grafo: co-ocurrencia', 'un umbral de cero significa cero, no el valor por defecto', function () {
+    var a = M.grafo.coocurrencia.crear();
+    a.agregar('x.md', [
+      { lema: 'alfa', forma: 'alfa', oracion: 0 }, { lema: 'beta', forma: 'beta', oracion: 1 }
+    ]);
+    var g = a.construir({ minFrecuencia: 0, minPeso: 0, minDocs: 0 });
+    igual(g.corte.minPeso, 0, 'el corte debe reflejar lo pedido, no lo supuesto');
+    igual(g.corte.minFrecuencia, 0);
+    igual(g.aristas.length, 1, 'con umbral cero no se descarta la arista débil');
+  });
+
+  // ------------------------------------------------------------- Louvain ---
+  caso('grafo: Louvain', 'reproduce la partición conocida del club de kárate', function () {
+    var r = M.grafo.louvain.detectar(34, KARATE);
+    igual(r.comunidades, 4, 'la partición canónica tiene cuatro comunidades');
+    afirmar(r.modularidad > 0.41 && r.modularidad < 0.43,
+      'la modularidad publicada ronda 0.4188, y salió ' + r.modularidad.toFixed(4));
+    afirmar(r.comunidad[0] !== r.comunidad[33],
+      'los dos líderes del club deben quedar en comunidades distintas');
+  });
+
+  caso('grafo: Louvain', 'la comunidad 0 es siempre la mayor', function () {
+    var r = M.grafo.louvain.detectar(34, KARATE);
+    var cuenta = {};
+    for (var i = 0; i < 34; i++) cuenta[r.comunidad[i]] = (cuenta[r.comunidad[i]] || 0) + 1;
+    var tamanos = Object.keys(cuenta).map(function (k) { return cuenta[k]; });
+    igual(cuenta[0], Math.max.apply(null, tamanos), 'la renumeración por tamaño debe ser estable');
+  });
+
+  caso('grafo: Louvain', 'las camarillas inconexas alcanzan el máximo teórico de Q', function () {
+    // Para k camarillas separadas, la modularidad máxima es 1 - 1/k.
+    function cliques(k) {
+      var aristas = [];
+      for (var c = 0; c < k; c++) {
+        var base = c * 3;
+        [[0, 1], [0, 2], [1, 2]].forEach(function (p) {
+          aristas.push({ a: base + p[0], b: base + p[1], peso: 1 });
+        });
+      }
+      return M.grafo.louvain.detectar(k * 3, aristas);
+    }
+    var dos = cliques(2);
+    igual(dos.comunidades, 2);
+    afirmar(Math.abs(dos.modularidad - 0.5) < 0.001, 'con dos camarillas Q = 0.5, y salió ' + dos.modularidad);
+    igual(M.grafo.louvain.diversidad(dos.modularidad).etiqueta, 'Diversa');
+
+    var tres = cliques(3);
+    igual(tres.comunidades, 3);
+    afirmar(Math.abs(tres.modularidad - 2 / 3) < 0.001, 'con tres camarillas Q = 0.667, y salió ' + tres.modularidad);
+    igual(M.grafo.louvain.diversidad(tres.modularidad).etiqueta, 'Dispersa',
+      'sólo a partir de tres islas separadas el corpus está de verdad disperso');
+  });
+
+  caso('grafo: Louvain', 'un grafo sin aristas no revienta', function () {
+    var r = M.grafo.louvain.detectar(5, []);
+    igual(r.modularidad, 0);
+    igual(r.comunidades, 5);
+  });
+
+  caso('grafo: Louvain', 'la diversidad temática cubre los cuatro tramos', function () {
+    igual(M.grafo.louvain.diversidad(0.10).etiqueta, 'Enfocada');
+    igual(M.grafo.louvain.diversidad(0.30).etiqueta, 'Media');
+    igual(M.grafo.louvain.diversidad(0.50).etiqueta, 'Diversa');
+    igual(M.grafo.louvain.diversidad(0.75).etiqueta, 'Dispersa');
+    afirmar(M.grafo.louvain.diversidad(0.5).q === 0.5, 'la cifra viaja siempre con la etiqueta');
+  });
+
+  // ------------------------------------------------------------ métricas ---
+  caso('grafo: métricas', 'la intermediación coincide con los valores conocidos', function () {
+    // Camino de cinco nodos: 0, 3, 4, 3, 0.
+    var camino = [{ a: 0, b: 1 }, { a: 1, b: 2 }, { a: 2, b: 3 }, { a: 3, b: 4 }].map(function (e) {
+      return { a: e.a, b: e.b, peso: 1 };
+    });
+    var r = M.grafo.metricas.intermediacion(5, camino);
+    igual(Math.round(r.valor[0]), 0);
+    igual(Math.round(r.valor[1]), 3);
+    igual(Math.round(r.valor[2]), 4);
+    igual(Math.round(r.valor[4]), 0);
+    afirmar(r.exacta, 'con cinco nodos el cálculo debe ser exacto');
+
+    // Kárate: valores publicados 231.07 para el nodo 0 y 160.55 para el 33.
+    var k = M.grafo.metricas.intermediacion(34, KARATE);
+    afirmar(Math.abs(k.valor[0] - 231.07) < 0.5, 'nodo 0: ' + k.valor[0].toFixed(2));
+    afirmar(Math.abs(k.valor[33] - 160.55) < 0.5, 'nodo 33: ' + k.valor[33].toFixed(2));
+  });
+
+  caso('grafo: métricas', 'el centro de una estrella se lleva toda la intermediación', function () {
+    var aristas = [];
+    for (var i = 1; i <= 5; i++) aristas.push({ a: 0, b: i, peso: 1 });
+    var r = M.grafo.metricas.intermediacion(6, aristas);
+    igual(r.valor[0], 10, 'los diez pares de hojas pasan por el centro');
+    igual(r.valor[3], 0, 'ninguna hoja intermedia nada');
+  });
+
+  caso('grafo: métricas', 'el muestreo aproxima sin mentir sobre lo que hace', function () {
+    var r = M.grafo.metricas.intermediacion(34, KARATE, { umbralExacto: 10, pivotes: 20 });
+    afirmar(r.exacta === false, 'debe declararse aproximada');
+    igual(r.fuentes, 20, 'y decir con cuántos pivotes');
+    afirmar(r.valor[0] > 100, 'el nodo más central debe seguir destacando: ' + r.valor[0].toFixed(1));
+    // Reproducible: la misma entrada, el mismo resultado.
+    var otra = M.grafo.metricas.intermediacion(34, KARATE, { umbralExacto: 10, pivotes: 20 });
+    igual(r.valor[0], otra.valor[0], 'el muestreo usa azar fijo: dos aperturas dan lo mismo');
+  });
+
+  caso('grafo: métricas', 'cuenta las componentes conexas', function () {
+    var r = M.grafo.metricas.componentes(5, [{ a: 0, b: 1, peso: 1 }, { a: 2, b: 3, peso: 1 }]);
+    igual(r.cuantas, 3, 'dos parejas y un nodo suelto');
+    igual(r.mayor, 2);
+  });
+
+  caso('grafo: métricas', 'los puntos conectores prefieren el puente al protagonista', function () {
+    // Dos camarillas unidas por un solo nodo poco frecuente.
+    var aristas = [];
+    [[0, 1], [0, 2], [1, 2], [4, 5], [4, 6], [5, 6], [2, 3], [3, 4]].forEach(function (p) {
+      aristas.push({ a: p[0], b: p[1], peso: 1 });
+    });
+    var nodos = [];
+    for (var i = 0; i < 7; i++) {
+      nodos.push({ id: i, lema: 'n' + i, forma: 'n' + i, frecuencia: i === 3 ? 2 : 40, docs: 1, rutas: [] });
+    }
+    var inter = M.grafo.metricas.intermediacion(7, aristas);
+    var conectores = M.grafo.metricas.puntosConectores(nodos, inter.normal, 5);
+    igual(conectores[0].lema, 'n3', 'el puente raro debe encabezar, no los nodos repetidos');
+  });
+
+  caso('grafo: métricas', 'el resumen de comunidad trae porcentaje y nombre por plantilla', function () {
+    var nodos = [
+      { id: 0, lema: 'edema', forma: 'edema', frecuencia: 9, docs: 2, rutas: ['a.md'] },
+      { id: 1, lema: 'disnea', forma: 'disnea', frecuencia: 7, docs: 2, rutas: ['a.md'] },
+      { id: 2, lema: 'docencia', forma: 'docencia', frecuencia: 5, docs: 1, rutas: ['b.md'] }
+    ];
+    var inter = new Float64Array([0.5, 0.3, 0.1]);
+    var r = M.grafo.metricas.resumirComunidades(nodos, [0, 0, 1], inter, 8);
+    igual(r.length, 2);
+    igual(r[0].nodos, 2);
+    afirmar(Math.abs(r[0].porcentaje - 66.67) < 0.1, 'porcentaje: ' + r[0].porcentaje);
+    contiene(r[0].nombre, 'edema', 'el nombre por plantilla usa los términos más centrales');
+  });
+
+  // --------------------------------------------------- capa de documentos ---
+  caso('grafo: documentos', 'resuelve enlaces relativos, wikilinks y declara los ambiguos', function () {
+    var rutas = ['clinica/notas.md', 'clinica/fisiopatologia.md', 'docencia/sesion.md', 'archivo/sesion.md'];
+    var idx = M.grafo.documentos.indiceDeRutas(rutas);
+    igual(M.grafo.documentos.resolver('fisiopatologia', 'clinica/notas.md', idx).indice, 1, 'wikilink por nombre');
+    igual(M.grafo.documentos.resolver('../docencia/sesion.md', 'clinica/notas.md', idx).indice, 2, 'ruta relativa');
+    igual(M.grafo.documentos.resolver('clinica/fisiopatologia.md', 'x.md', idx).indice, 1, 'ruta desde la raíz');
+    igual(M.grafo.documentos.resolver('sesion', 'clinica/notas.md', idx).motivo, 'ambiguo',
+      'dos documentos con el mismo nombre no producen una dependencia inventada');
+    igual(M.grafo.documentos.resolver('no-existe.md', 'clinica/notas.md', idx).motivo, 'sin destino');
+  });
+
+  caso('grafo: documentos', 'detecta secuencias de versión por el nombre', function () {
+    var aristas = M.grafo.documentos.secuenciasDeVersion([
+      'ensayo v1.md', 'ensayo v2.md', 'ensayo v3.md', 'otro.md'
+    ]);
+    igual(aristas.length, 2, 'tres versiones encadenan dos aristas');
+    igual(aristas[0].tipo, 'version');
+    var conCopia = M.grafo.documentos.secuenciasDeVersion(['informe borrador.md', 'informe final.md']);
+    igual(conCopia.length, 1, 'borrador y final son la misma secuencia');
+    afirmar(M.grafo.documentos.analizarVersion('sin marcas.md') === null, 'un nombre normal no es una versión');
+  });
+
+  caso('grafo: documentos', 'las referencias compartidas exigen más de una coincidencia', function () {
+    var claves = [
+      new Set(['cita:perez:2019', 'cita:lopez:2020', 'doi:10.1001/x']),
+      new Set(['cita:perez:2019', 'cita:lopez:2020']),
+      new Set(['cita:perez:2019'])
+    ];
+    var aristas = M.grafo.documentos.aristasPorReferencia(claves, 2);
+    igual(aristas.length, 1, 'sólo el par que comparte dos referencias');
+    igual(aristas[0].peso, 2);
+  });
+
+  caso('grafo: documentos', 'extrae DOI y citas de autor y año', function () {
+    var c = M.grafo.documentos.clavesBibliograficas(
+      'Como señala Perez, 2019 y confirma Lopez et al., 2020 (doi 10.1001/jama.2019.1234).');
+    var lista = Array.from(c);
+    afirmar(lista.indexOf('cita:perez:2019') !== -1, 'falta la cita simple: ' + lista.join(', '));
+    afirmar(lista.indexOf('cita:lopez:2020') !== -1, 'falta la cita con et al.');
+    afirmar(lista.some(function (x) { return x.indexOf('doi:10.1001/jama.2019.1234') === 0; }), 'falta el DOI');
+  });
+
+  caso('grafo: documentos', 'la afinidad ignora el vocabulario que está en todas partes', function () {
+    var docs = [];
+    for (var i = 0; i < 6; i++) {
+      docs.push({ ruta: 'd' + i + '.md', terminos: [{ lema: 'comun', n: 10 }, { lema: 'propio' + i, n: 5 }] });
+    }
+    var r = M.grafo.documentos.afinidad(docs, { suelo: 0.01 });
+    igual(r.pares.length, 0, 'un término presente en todos los documentos no puede emparejarlos');
+    afirmar(r.terminosIgnorados >= 1, 'y debe contarse como ignorado');
+  });
+
+  caso('grafo: documentos', 'la afinidad separa dependencia de estadística', function () {
+    var docs = [
+      { ruta: 'a.md', nombre: 'a.md', ext: 'md', estado: 'ok', palabras: 300, meta: { enlaces: [{ tipo: 'wikilink', destino: 'b' }] },
+        texto: '', terminos: [{ lema: 'insuficiencia', n: 5 }, { lema: 'cardiaca', n: 4 }] },
+      { ruta: 'b.md', nombre: 'b.md', ext: 'md', estado: 'ok', palabras: 300, meta: { enlaces: [] },
+        texto: '', terminos: [{ lema: 'insuficiencia', n: 3 }, { lema: 'cardiaca', n: 3 }] },
+      { ruta: 'c.md', nombre: 'c.md', ext: 'md', estado: 'ok', palabras: 300, meta: { enlaces: [] },
+        texto: '', terminos: [{ lema: 'docencia', n: 6 }] }
+    ];
+    var g = M.grafo.documentos.construir(docs, { suelo: 0.05 });
+    igual(g.dependencias.length, 1, 'una sola dependencia escrita');
+    igual(g.dependencias[0].tipo, 'enlace');
+    afirmar(g.afinidades.some(function (e) { return (e.a === 0 && e.b === 1) || (e.a === 1 && e.b === 0); }),
+      'a.md y b.md comparten vocabulario');
+    afirmar(!g.afinidades.some(function (e) { return e.a === 2 || e.b === 2; }),
+      'c.md no comparte nada con nadie');
+  });
+
+  // ----------------------------------------------------------- capa mixta ---
+  caso('grafo: capa mixta', 'une conceptos y documentos, y señala a los que no tocan nada', function () {
+    var conceptos = { nodos: [
+      { id: 0, lema: 'edema', forma: 'edema' },
+      { id: 1, lema: 'disnea', forma: 'disnea' }
+    ] };
+    var capaDocs = { nodos: [
+      { id: 0, ruta: 'a.md' }, { id: 1, ruta: 'b.md' }, { id: 2, ruta: 'foto.png' }
+    ] };
+    var docs = [
+      { ruta: 'a.md', terminos: [{ lema: 'edema', n: 3 }, { lema: 'disnea', n: 2 }] },
+      { ruta: 'b.md', terminos: [{ lema: 'edema', n: 1 }] },
+      { ruta: 'foto.png', terminos: [], terminosRuta: [{ lema: 'radiografia', n: 1 }] }
+    ];
+    var m = M.grafo.mixta.construir(conceptos, capaDocs, docs, {});
+    igual(m.totales.pertenencias, 3);
+    igual(m.totales.documentosSinConcepto, 1, 'la imagen no toca ningún concepto del grafo');
+    igual(m.huerfanos[0], 2);
+  });
+
+  // -------------------------------------------------------------- colores ---
+  caso('grafo: colores', 'doce comunidades siguen siendo distinguibles', function () {
+    var tonos = [];
+    for (var i = 0; i < 12; i++) tonos.push(M.colores.tono(i));
+    for (var a = 0; a < 12; a++) {
+      for (var b = a + 1; b < 12; b++) {
+        var d = Math.abs(tonos[a] - tonos[b]);
+        var separacion = Math.min(d, 360 - d);
+        afirmar(separacion > 10, 'los tonos ' + a + ' y ' + b + ' están a ' + separacion.toFixed(1) + ' grados');
+      }
+    }
+  });
+
+  caso('grafo: colores', 'el respaldo sin oklch produce sRGB válido', function () {
+    for (var i = 0; i < 15; i++) {
+      var c = M.colores.aRgb(i);
+      afirmar(/^rgb\(\d{1,3},\d{1,3},\d{1,3}\)$/.test(c), 'color inválido en ' + i + ': ' + c);
+    }
   });
 
   return { casos: casos, afirmar: afirmar, igual: igual, contiene: contiene, noContiene: noContiene };

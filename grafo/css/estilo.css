@@ -198,3 +198,55 @@ details.plegable > div { padding: 0 12px 12px; }
 .barra-inferior .sep { color: var(--linea-fuerte); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* --- Fase 3: capas del grafo -------------------------------------------- */
+
+/* Conmutador de capas. Tres estados excluyentes, sin animación: cambiar de
+   capa es cambiar de pregunta, no una transición decorativa. */
+.conmutador { display: flex; gap: 1px; background: var(--linea); border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; margin-bottom: 12px; }
+.conmutador button {
+  flex: 1; min-height: var(--tacto); border: 0; border-radius: 0;
+  background: var(--fondo-hundido); color: var(--texto-tenue);
+  font-size: 13px; letter-spacing: 0.02em; padding: 0 8px;
+}
+.conmutador button[aria-selected="true"] { background: var(--fondo-alto); color: var(--texto); box-shadow: inset 0 -2px 0 var(--activo); }
+
+.capa[hidden] { display: none; }
+
+/* Medidor de diversidad temática: la barra es la modularidad en su rango real,
+   con los cuatro tramos marcados para que la cifra tenga contexto. */
+.diversidad { border: 1px solid var(--linea); border-radius: var(--radio); background: var(--fondo-alto); padding: 12px; }
+.diversidad .cabeza { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.diversidad .etiqueta-grande { font-size: 18px; font-weight: 600; }
+.diversidad .q { font-family: var(--mono); font-size: 13px; color: var(--texto-medio); }
+.diversidad p { margin: 8px 0 0; font-size: 13px; color: var(--texto-medio); }
+.escala { position: relative; height: 22px; margin: 12px 0 4px; }
+.escala .tramos { position: absolute; inset: 0 0 12px; display: flex; gap: 1px; }
+.escala .tramos i { flex: 1; background: var(--fondo-hundido); border-radius: 1px; }
+.escala .tramos i.activo { background: var(--linea-fuerte); }
+.escala .aguja { position: absolute; top: -2px; width: 2px; height: 14px; background: var(--activo); }
+.escala .rotulos { position: absolute; left: 0; right: 0; bottom: 0; display: flex; font-family: var(--mono); font-size: 9.5px; color: var(--texto-tenue); }
+.escala .rotulos span { flex: 1; text-align: center; }
+
+/* Comunidad: el chip de color es el único lugar del armazón donde entra
+   saturación, y viene de la rueda OKLCH, no de una lista fija. */
+.comunidad { border: 1px solid var(--linea); border-left-width: 3px; border-radius: var(--radio); background: var(--fondo-alto); padding: 10px 12px; margin-top: 8px; }
+.comunidad .cabeza { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.comunidad .chip { width: 12px; height: 12px; border-radius: 2px; flex: 0 0 12px; }
+.comunidad .nombre { font-weight: 600; font-size: 13.5px; }
+.comunidad .cifra-com { font-family: var(--mono); font-size: 11.5px; color: var(--texto-medio); margin-left: auto; white-space: nowrap; }
+.comunidad .terminos { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 5px; }
+
+.barra-reparto { display: flex; height: 8px; border-radius: 2px; overflow: hidden; gap: 1px; margin: 4px 0 10px; }
+.barra-reparto i { display: block; min-width: 2px; }
+
+.aviso-corte { font-family: var(--mono); font-size: 11.5px; color: var(--aviso); margin-top: 8px; }
+
+/* Aristas de la capa de documentos: sólida es dependencia, punteada es
+   afinidad. La distinción es el argumento entero de esa capa. */
+.arista-tipo { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--texto-medio); }
+.arista-tipo::before { content: ''; width: 18px; height: 0; border-top: 2px solid var(--texto-medio); }
+.arista-tipo.afinidad::before { border-top-style: dotted; }
+.arista-tipo.enlace::before { border-color: var(--ok); }
+.arista-tipo.version::before { border-color: var(--activo); }
+.arista-tipo.referencia::before { border-color: var(--aviso); }

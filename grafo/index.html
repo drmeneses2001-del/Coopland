@@ -15,7 +15,7 @@
 
 <header class="principal">
   <h1>Grafo de conocimiento</h1>
-  <span class="fase">Fases 1 y 2 · ingesta e índice</span>
+  <span class="fase">Fases 1–3 · ingesta, índice y grafo</span>
   <span class="estado" id="estado-global">iniciando…</span>
 </header>
 
@@ -110,6 +110,127 @@
   </section>
 
   <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-grafo" hidden>
+    <h2>Grafo <span class="cuenta" id="grafo-fecha"></span></h2>
+
+    <div class="acciones" id="acciones-grafo">
+      <button class="primario" id="btn-construir-grafo">Construir el grafo</button>
+      <span class="etiqueta" id="grafo-estado"></span>
+    </div>
+
+    <div class="progreso" id="progreso-grafo" hidden style="margin-top:12px">
+      <div class="linea"><span id="grafo-fase">preparando</span><span id="grafo-cuenta"></span></div>
+      <div class="barra"><i id="grafo-barra"></i></div>
+    </div>
+
+    <div id="grafo-contenido" hidden>
+      <div class="cifras" id="cifras-grafo" style="margin-top:12px"></div>
+      <div class="aviso-corte" id="grafo-corte"></div>
+
+      <div class="conmutador" id="conmutador-capas" role="tablist" style="margin-top:16px">
+        <button role="tab" aria-selected="true" data-capa="conceptos">Conceptos</button>
+        <button role="tab" aria-selected="false" data-capa="documentos">Documentos</button>
+        <button role="tab" aria-selected="false" data-capa="mixta">Mixta</button>
+      </div>
+
+      <!-- capa de conceptos -->
+      <div class="capa" id="capa-conceptos">
+        <div class="diversidad" id="medidor-diversidad"></div>
+
+        <section class="bloque">
+          <h2>Temas <span class="cuenta" id="temas-cuenta"></span></h2>
+          <div class="barra-reparto" id="reparto-comunidades"></div>
+          <div id="lista-comunidades"></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Conceptos más influyentes</h2>
+          <p class="nota">
+            Ordenados por intermediación (betweenness): en cuántos caminos mínimos
+            entre otros dos conceptos aparece cada uno. Es lo que determina el
+            tamaño del nodo en el lienzo.
+          </p>
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-influyentes"></table></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Puntos conectores del discurso</h2>
+          <p class="nota">
+            Conceptos con intermediación alta en relación con lo poco que se
+            repiten: unen territorios sin ser protagonistas. Suelen ser lo más
+            interesante del grafo, y son invisibles para cualquier recuento de
+            frecuencia.
+          </p>
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-conectores"></table></div>
+        </section>
+      </div>
+
+      <!-- capa de documentos -->
+      <div class="capa" id="capa-documentos" hidden>
+        <div class="cifras" id="cifras-documentos"></div>
+
+        <section class="bloque">
+          <h2>Dependencias explícitas <span class="cuenta" id="dependencias-cuenta"></span></h2>
+          <p class="nota">
+            Alguien escribió estos enlaces: wikilinks, enlaces relativos, rutas
+            citadas, referencias bibliográficas repetidas y secuencias de versión.
+            Son hechos, no estadística — por eso se dibujan con línea sólida.
+          </p>
+          <div class="acciones" style="margin:0 0 8px">
+            <span class="arista-tipo enlace">enlace</span>
+            <span class="arista-tipo referencia">referencia compartida</span>
+            <span class="arista-tipo version">versión</span>
+          </div>
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-dependencias"></table></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Afinidad semántica <span class="cuenta" id="afinidades-cuenta"></span></h2>
+          <p class="nota">
+            Coseno TF-IDF entre documentos: dos textos que comparten vocabulario
+            poco común. Es una estadística, no una decisión de quien escribió —
+            por eso va con línea punteada y umbral ajustable.
+          </p>
+          <label class="campo" for="umbral-afinidad">Umbral de coseno · <span id="umbral-valor">0.12</span></label>
+          <input type="range" id="umbral-afinidad" min="0.05" max="0.9" step="0.01" value="0.12" style="width:100%;min-height:44px">
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-afinidades"></table></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Documentos aislados <span class="cuenta" id="aislados-cuenta"></span></h2>
+          <p class="nota">
+            Ricos en contenido, sin ninguna dependencia explícita. Es la firma
+            estructural del texto que escribiste y nunca volviste a conectar con
+            nada. La Fase 4 los convertirá en preguntas.
+          </p>
+          <div class="desplaza"><table class="datos" id="tabla-aislados"></table></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Enlaces sin destino <span class="cuenta" id="sinresolver-cuenta"></span></h2>
+          <p class="nota">Enlaces escritos que no apuntan a ningún documento del índice. No se inventa el destino: se listan.</p>
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-sinresolver"></table></div>
+        </section>
+      </div>
+
+      <!-- capa mixta -->
+      <div class="capa" id="capa-mixta" hidden>
+        <div class="cifras" id="cifras-mixta"></div>
+        <p class="nota" style="margin-top:12px">
+          Documentos y conceptos en el mismo lienzo, unidos por aristas de
+          pertenencia. Los índices inversos ya están calculados y guardados: son
+          los que harán instantáneo, en la Fase 5, iluminar los documentos de un
+          concepto o desplegar el subgrafo de un documento.
+        </p>
+        <section class="bloque">
+          <h2>Documentos sin ningún concepto <span class="cuenta" id="huerfanos-cuenta"></span></h2>
+          <div class="desplaza"><table class="datos" id="tabla-huerfanos"></table></div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
   <section class="bloque">
     <h2>Ajustes</h2>
     <details class="plegable">
@@ -158,7 +279,10 @@
   <span>palabras <b id="bi-palabras">—</b></span><span class="sep">│</span>
   <span>no leídos <b id="bi-errores">—</b></span><span class="sep">│</span>
   <span>arranque <b id="bi-arranque">—</b></span><span class="sep">│</span>
-  <span>último índice <b id="bi-duracion">—</b></span>
+  <span>último índice <b id="bi-duracion">—</b></span><span class="sep">│</span>
+  <span>conceptos en grafo <b id="bi-grafo-nodos">—</b></span><span class="sep">│</span>
+  <span>comunidades <b id="bi-comunidades">—</b></span><span class="sep">│</span>
+  <span>modularidad <b id="bi-modularidad">—</b></span>
 </div>
 
 <script src="js/nucleo/hash.js"></script>
@@ -172,8 +296,15 @@
 <script src="js/nucleo/indexador.js"></script>
 <script src="js/ingesta/capacidades.js"></script>
 <script src="js/ingesta/ingesta.js"></script>
+<script src="js/grafo/coocurrencia.js"></script>
+<script src="js/grafo/louvain.js"></script>
+<script src="js/grafo/metricas.js"></script>
+<script src="js/grafo/documentos.js"></script>
+<script src="js/grafo/mixta.js"></script>
 <script src="js/ui/formato.js"></script>
+<script src="js/ui/colores.js"></script>
 <script src="js/ui/vistas.js"></script>
+<script src="js/ui/vistas-grafo.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

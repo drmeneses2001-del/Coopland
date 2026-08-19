@@ -3,7 +3,7 @@
    contenido del usuario — los documentos nunca pasan por aquí. */
 'use strict';
 
-var VERSION = 'grafo-v1';
+var VERSION = 'grafo-v3';   // sube con cada fase: invalida la caché anterior
 var ARMAZON = [
   './',
   './index.html',
@@ -29,9 +29,17 @@ var ARMAZON = [
   './js/parsers/pdf.js',
   './js/parsers/docx.js',
   './js/parsers/binario.js',
+  './js/grafo/coocurrencia.js',
+  './js/grafo/louvain.js',
+  './js/grafo/metricas.js',
+  './js/grafo/documentos.js',
+  './js/grafo/mixta.js',
   './js/trabajadores/extractor.js',
+  './js/trabajadores/grafista.js',
   './js/ui/formato.js',
+  './js/ui/colores.js',
   './js/ui/vistas.js',
+  './js/ui/vistas-grafo.js',
   './vendor/fflate.umd.js',
   './vendor/pdf.min.js',
   './vendor/pdf.worker.min.js',

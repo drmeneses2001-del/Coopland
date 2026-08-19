@@ -144,3 +144,152 @@
 
   GC.casosNavegador = { casos: casos };
 })(typeof self !== 'undefined' ? self : globalThis);
+
+// ============================ Fase 3: el grafo ============================
+(function (raiz) {
+  'use strict';
+  var GC = raiz.GC;
+  var A = GC.casos;
+  var casos = GC.casosNavegador.casos;
+  function caso(grupo, nombre, fn) { casos.push({ grupo: grupo, nombre: nombre, fn: fn }); }
+
+  function archivo(nombre, texto, modificado) {
+    return new File([texto], nombre, { lastModified: modificado || 1700000000000 });
+  }
+
+  // Corpus mínimo pero con estructura reconocible: dos territorios que apenas
+  // se tocan y un documento que enlaza a otro. Basta para comprobar que las
+  // tres capas dicen lo que deben decir.
+  var CORPUS = [
+    ['clinica/insuficiencia.md',
+     '# Insuficiencia cardiaca\n\n' +
+     'La insuficiencia cardiaca produce disnea de esfuerzo y edema maleolar. ' +
+     'La disnea empeora con el edema pulmonar. El edema responde al diuretico. ' +
+     'El diuretico alivia la disnea del paciente con insuficiencia cardiaca. ' +
+     'Segun Perez, 2019 la insuficiencia cardiaca con edema exige diuretico.\n\n' +
+     'Ver [[fisiopatologia]] para el mecanismo del edema.\n'],
+    ['clinica/fisiopatologia.md',
+     'El mecanismo del edema en la insuficiencia cardiaca depende de la presion. ' +
+     'La presion venosa eleva el edema intersticial. La insuficiencia cardiaca eleva la presion. ' +
+     'El edema intersticial produce disnea. Perez, 2019 describe la presion venosa y el edema.\n'],
+    ['docencia/simulacion.md',
+     'La simulacion clinica mejora la retencion de habilidades del residente. ' +
+     'El residente entrena habilidades con simulacion de alta fidelidad. ' +
+     'La retencion de habilidades depende de la repeticion del residente. ' +
+     'La simulacion con repeticion mejora la retencion del residente.\n'],
+    ['docencia/evaluacion.md',
+     'La evaluacion del residente mide la retencion de habilidades clinicas. ' +
+     'La simulacion permite la evaluacion objetiva del residente. ' +
+     'La evaluacion objetiva del residente exige rubricas de habilidades.\n']
+  ];
+
+  async function sembrarCorpus(pool) {
+    var inventario = CORPUS.map(function (par) {
+      var bytes = new TextEncoder().encode(par[1]);
+      var partes = par[0].split('/');
+      return {
+        ruta: par[0], nombre: partes[partes.length - 1],
+        tamano: bytes.length, modificado: 1700000000000,
+        archivo: archivo(partes[partes.length - 1], par[1])
+      };
+    });
+    return await GC.indexador.indexar({
+      inventario: inventario, pool: pool, indicePrevio: GC.indice.vacio(), origen: 'prueba-grafo'
+    });
+  }
+
+  caso('navegador: grafo', 'construye las tres capas desde el índice guardado', async function () {
+    var extractor = GC.pool.crear({ ruta: '../js/trabajadores/extractor.js', n: 2 });
+    var grafista = GC.pool.crear({ ruta: '../js/trabajadores/grafista.js', n: 1 });
+    try {
+      await GC.almacen.vaciar('documentos');
+      await GC.almacen.vaciar('grafo');
+      var indexado = await sembrarCorpus(extractor);
+      A.igual(indexado.indice.docs.length, 4, 'deben quedar cuatro documentos indexados');
+
+      var fases = [];
+      var r = await grafista.enviarA(0, {
+        t: 'construir',
+        opciones: { baseDeDatos: GC.bdPruebas, minFrecuencia: 2, minPeso: 1, sueloAfinidad: 0.05 }
+      }, function (p) { fases.push(p.fase); });
+
+      A.afirmar(r.t === 'grafo-listo', 'el worker respondió: ' + r.t + ' ' + (r.error || ''));
+      A.afirmar(fases.length >= 3, 'debe informar del progreso por fases: ' + fases.join(', '));
+
+      var c = r.resumen.conceptos;
+      A.afirmar(c.nodos > 8, 'el grafo debería tener conceptos, y tiene ' + c.nodos);
+      A.afirmar(c.aristas > 0, 'y aristas');
+      A.afirmar(c.comunidades >= 2, 'dos territorios separados deben dar al menos dos comunidades, dio ' + c.comunidades);
+      A.afirmar(c.modularidad > 0.2, 'con territorios separados Q no puede ser baja: ' + c.modularidad.toFixed(3));
+      A.afirmar(!!c.diversidad.etiqueta, 'la diversidad temática debe traer etiqueta');
+      A.igual(c.diversidad.q, c.modularidad, 'la cifra debe acompañar siempre a la etiqueta');
+
+      // La partición debe separar lo clínico de lo docente.
+      var capas = await GC.almacen.leer('grafo', 'capas');
+      A.afirmar(!!capas, 'el grafo debe quedar guardado en IndexedDB');
+      var comunidadDe = {};
+      capas.conceptos.nodos.forEach(function (n, i) { comunidadDe[n.lema] = capas.conceptos.comunidad[i]; });
+      if (comunidadDe.edema != null && comunidadDe.residente != null) {
+        A.afirmar(comunidadDe.edema !== comunidadDe.residente,
+          'el edema y el residente no pueden caer en la misma comunidad');
+      }
+
+      // Capa de documentos: el wikilink es dependencia; el parecido, afinidad.
+      var d = r.resumen.documentos;
+      A.afirmar(d.dependencias.some(function (e) {
+        return /insuficiencia\.md/.test(e.desde + e.hasta) && /fisiopatologia\.md/.test(e.desde + e.hasta) && e.tipo === 'enlace';
+      }), 'falta la dependencia por wikilink: ' + JSON.stringify(d.dependencias));
+      A.afirmar(d.afinidades.length > 0, 'debe haber al menos un par con afinidad');
+      A.afirmar(d.afinidades.every(function (e) { return e.desde !== e.hasta; }), 'ningún documento consigo mismo');
+
+      // Capa mixta.
+      A.afirmar(r.resumen.mixta.pertenencias > 0, 'la capa mixta debe unir documentos y conceptos');
+      A.igual(r.resumen.mixta.documentosConConcepto, 4, 'los cuatro documentos tocan conceptos');
+
+      // Trazabilidad: cada arista sabe de qué oración salió.
+      var conMuestra = capas.conceptos.aristas.filter(function (e) { return e.muestras && e.muestras.length; });
+      A.afirmar(conMuestra.length > 0, 'las aristas deben conservar su oración de origen');
+      A.afirmar(typeof conMuestra[0].muestras[0].ruta === 'string', 'con la ruta del documento');
+    } finally {
+      extractor.terminar(); grafista.terminar();
+      await GC.almacen.vaciar('documentos');
+      await GC.almacen.vaciar('grafo');
+    }
+  });
+
+  caso('navegador: grafo', 'la instantánea guarda lo justo para reanimar el pasado', async function () {
+    var extractor = GC.pool.crear({ ruta: '../js/trabajadores/extractor.js', n: 2 });
+    var grafista = GC.pool.crear({ ruta: '../js/trabajadores/grafista.js', n: 1 });
+    try {
+      await GC.almacen.vaciar('documentos');
+      await sembrarCorpus(extractor);
+      var r = await grafista.enviarA(0, {
+        t: 'construir', opciones: { baseDeDatos: GC.bdPruebas, minFrecuencia: 2 }
+      });
+      var i = r.instantanea;
+      A.afirmar(!!i, 'debe venir una instantánea');
+      A.afirmar(i.nodos.length > 0 && i.nodos.length <= 500, 'la instantánea se recorta a 500 nodos');
+      A.afirmar(typeof i.modularidad === 'number', 'con su modularidad');
+      A.afirmar(i.nodos[0].comunidad != null, 'y la comunidad de cada nodo, que es el color al reanimar');
+      i.aristas.forEach(function (e) {
+        A.afirmar(e[0] < i.nodos.length && e[1] < i.nodos.length,
+          'las aristas de la instantánea deben apuntar dentro de sus propios nodos');
+      });
+      A.afirmar(i.contadores.documentos === 4, 'y los contadores del momento');
+    } finally {
+      extractor.terminar(); grafista.terminar();
+      await GC.almacen.vaciar('documentos');
+      await GC.almacen.vaciar('grafo');
+    }
+  });
+
+  caso('navegador: grafo', 'un índice vacío se declara vacío, no se inventa un grafo', async function () {
+    var grafista = GC.pool.crear({ ruta: '../js/trabajadores/grafista.js', n: 1 });
+    try {
+      await GC.almacen.vaciar('documentos');
+      var r = await grafista.enviarA(0, { t: 'construir', opciones: { baseDeDatos: GC.bdPruebas } });
+      A.igual(r.t, 'grafo-vacio');
+      A.contiene(r.motivo, 'No hay documentos');
+    } finally { grafista.terminar(); }
+  });
+})(typeof self !== 'undefined' ? self : globalThis);

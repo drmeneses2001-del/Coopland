@@ -2,7 +2,7 @@
   'use strict';
 
   var GC = self.GC;
-  var V = GC.ui.vistas, F = GC.ui.formato;
+  var V = GC.ui.vistas, VG = GC.ui.vistasGrafo, F = GC.ui.formato;
   var $ = function (id) { return document.getElementById(id); };
 
   var estado = {
@@ -14,7 +14,13 @@
     handleCarpeta: null,
     arranqueMs: null,
     ultimaDuracion: null,
-    trabajando: false
+    trabajando: false,
+    grafista: null,
+    resumenGrafo: null,
+    comunidadPorNodo: null,
+    huerfanos: null,
+    umbralAfinidad: 0.12,
+    capaActiva: 'conceptos'
   };
 
   function decir(texto) { $('estado-global').textContent = texto; }
@@ -26,6 +32,106 @@
       estado.pool = GC.pool.crear({ ruta: 'js/trabajadores/extractor.js', n: n });
     }
     return estado.pool;
+  }
+
+  function grafista() {
+    if (!estado.grafista) {
+      estado.grafista = GC.pool.crear({ ruta: 'js/trabajadores/grafista.js', n: 1 });
+    }
+    return estado.grafista;
+  }
+
+  // ------------------------------------------------------------------ grafo
+  async function construirGrafo(automatico) {
+    if (estado.trabajando) return;
+    if (!estado.indice.docs.length) { decir('no hay documentos que convertir en grafo'); return; }
+    estado.trabajando = true;
+    V.mostrar('bloque-grafo', true);
+    $('progreso-grafo').hidden = false;
+    $('btn-construir-grafo').disabled = true;
+    $('grafo-estado').textContent = 'construyendo…';
+    decir(automatico ? 'construyendo el grafo…' : 'construyendo el grafo a petición…');
+
+    var texto = (await GC.almacen.config('vaciasPropias')) || '';
+    var vaciasPropias = texto.split(/[\n,;]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+
+    try {
+      var r = await grafista().enviarA(0, {
+        t: 'construir',
+        opciones: {
+          vaciasPropias: vaciasPropias,
+          sueloAfinidad: 0.12,
+          maxNodos: 3000,
+          minFrecuencia: 2
+        }
+      }, VG.progreso);
+
+      if (r.t === 'grafo-vacio') { decir(r.motivo); $('grafo-estado').textContent = 'sin datos'; return; }
+      if (r.t === 'error' || r.error) {
+        decir('fallo al construir el grafo: ' + (r.error || 'desconocido'));
+        $('grafo-estado').textContent = 'error';
+        console.error(r.pila || r.error);
+        return;
+      }
+
+      estado.resumenGrafo = r.resumen;
+      await GC.almacen.config('resumenGrafo', r.resumen);
+      await cargarDetalleGrafo();
+      pintarGrafo();
+      await guardarInstantaneaDeGrafo(r.instantanea);
+      $('grafo-estado').textContent = 'al día';
+      decir('grafo al día · ' + F.numero(r.resumen.conceptos.nodos) + ' conceptos, ' +
+            F.numero(r.resumen.conceptos.comunidades) + ' comunidades, Q = ' +
+            r.resumen.conceptos.modularidad.toFixed(3) + ' · ' + F.duracion(r.resumen.duracionMs));
+    } catch (e) {
+      decir('fallo al construir el grafo: ' + (e && e.message || e));
+      console.error(e);
+    } finally {
+      estado.trabajando = false;
+      $('progreso-grafo').hidden = true;
+      $('btn-construir-grafo').disabled = false;
+      refrescarEspacio();
+    }
+  }
+
+  // El resumen que llega por mensaje no trae los arreglos completos: la
+  // comunidad de cada nodo y los huérfanos se leen del registro guardado.
+  async function cargarDetalleGrafo() {
+    var capas = await GC.almacen.leer('grafo', 'capas');
+    if (!capas) { estado.comunidadPorNodo = null; estado.huerfanos = null; return; }
+    estado.comunidadPorNodo = capas.conceptos.comunidad;
+    var porId = new Map();
+    capas.documentos.nodos.forEach(function (n) { porId.set(n.id, n.ruta); });
+    estado.huerfanos = (capas.mixta.huerfanos || []).map(function (id) { return porId.get(id); }).filter(Boolean);
+  }
+
+  function pintarGrafo() {
+    if (!estado.resumenGrafo) return;
+    V.mostrar('bloque-grafo', true);
+    $('grafo-contenido').hidden = false;
+    var comunidades = estado.comunidadPorNodo;
+    VG.pintar(estado.resumenGrafo, {
+      comunidadDe: comunidades ? function (id) { return comunidades[id]; } : null,
+      umbral: estado.umbralAfinidad,
+      huerfanos: estado.huerfanos
+    });
+    VG.capaVisible(estado.capaActiva);
+    $('umbral-afinidad').value = String(estado.umbralAfinidad);
+  }
+
+  // La instantánea de la apertura ya existía desde la Fase 2 con el campo
+  // `grafo` en null; ahora se rellena con la serialización compacta.
+  async function guardarInstantaneaDeGrafo(instantanea) {
+    var lista = await GC.almacen.listarInstantaneas();
+    var ultima = lista[lista.length - 1];
+    if (ultima && !ultima.grafo && (Date.now() - ultima.fecha) < 10 * 60 * 1000) {
+      ultima.grafo = instantanea;
+      ultima.version = 'fase3';
+      await GC.almacen.guardarLote('instantaneas', [ultima]);
+    } else {
+      await GC.indexador.guardarInstantanea(estado.indice, { grafo: instantanea, version: 'fase3' });
+    }
+    refrescarHistorial();
   }
 
   async function aplicarVacias() {
@@ -53,6 +159,7 @@
     V.conceptos(estado.indice.vocabulario);
 
     if (cambios) { V.mostrar('bloque-cambios', true); V.cambios(cambios, estado.indice.fecha); }
+    V.mostrar('bloque-grafo', estado.indice.docs.length > 0);
 
     V.barra(est, (est.porEstado.error || 0), estado.arranqueMs, duracionMs != null ? duracionMs : estado.ultimaDuracion);
     refrescarHistorial();
@@ -235,6 +342,8 @@
       if (resumenIngesta.noDescargados) {
         decir('índice al día · atención: ' + resumenIngesta.noDescargados + ' archivos no están descargados de iCloud');
       }
+      estado.trabajando = false;
+      await construirGrafo(true);
     } catch (e) {
       decir('fallo en la indexación: ' + (e && e.message || e));
       console.error(e);
@@ -257,8 +366,18 @@
       decir('no se pudo abrir el índice: ' + e.message);
     }
 
+    // El grafo guardado se recupera igual que el índice: sin recalcular nada.
+    try {
+      var capasGuardadas = await GC.almacen.leer('grafo', 'capas');
+      if (capasGuardadas) {
+        estado.resumenGrafo = await GC.almacen.config('resumenGrafo');
+        await cargarDetalleGrafo();
+      }
+    } catch (e) { /* todavía no hay grafo */ }
+
     estado.arranqueMs = performance.now() - t0;
     repintar(null, null);
+    if (estado.resumenGrafo) pintarGrafo();
     decir(estado.indice.docs.length
       ? 'índice reconstruido en ' + F.duracion(estado.arranqueMs)
       : 'sin índice todavía');
@@ -297,6 +416,17 @@
   // ------------------------------------------------------------------ eventos
   $('filtro-inventario').addEventListener('input', function () {
     V.inventario(estado.indice.docs, this.value);
+  });
+  $('btn-construir-grafo').addEventListener('click', function () { construirGrafo(false); });
+  $('conmutador-capas').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-capa]');
+    if (!b) return;
+    estado.capaActiva = b.dataset.capa;
+    VG.capaVisible(estado.capaActiva);
+  });
+  $('umbral-afinidad').addEventListener('input', function () {
+    estado.umbralAfinidad = parseFloat(this.value);
+    if (estado.resumenGrafo) VG.afinidades(estado.resumenGrafo.documentos.afinidades, estado.umbralAfinidad);
   });
   $('btn-verificar-b').addEventListener('click', verificarB);
   $('btn-reset-verif').addEventListener('click', async function () {

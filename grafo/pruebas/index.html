@@ -19,19 +19,21 @@
 <body>
 <header class="principal">
   <h1>Pruebas</h1>
-  <span class="fase">fases 1 y 2</span>
+  <span class="fase">fases 1 a 3</span>
   <span class="estado" id="marcador">—</span>
 </header>
 <div class="envoltorio">
   <section class="bloque">
     <p class="nota">
       Este corredor ejecuta las mismas pruebas que <code>node pruebas/nodo.js</code> y añade
-      las que sólo existen en el navegador: workers, IndexedDB y el ciclo completo de
-      indexación incremental. Es la comprobación que hay que ver en verde <b>en el iPad</b>.
+      las que sólo existen en el navegador: workers, IndexedDB, el grafo completo y el
+      ciclo de indexación incremental. Es la comprobación que hay que ver en verde
+      <b>en el iPad</b>. Se ejecutan sobre una base de datos propia
+      (<code>grafo-conocimiento-pruebas</code>): tu índice real no se toca.
     </p>
     <div class="acciones">
       <button class="primario" id="btn-correr">Ejecutar</button>
-      <button id="btn-limpiar">Borrar el índice de este navegador</button>
+      <button id="btn-limpiar">Borrar la base de pruebas</button>
     </div>
     <div class="cifras" id="resumen" style="margin-top:14px" hidden></div>
   </section>
@@ -60,6 +62,13 @@
 <script src="../js/parsers/docx.js"></script>
 <script src="../js/parsers/binario.js"></script>
 <script src="../js/parsers/registro.js"></script>
+<script src="../js/grafo/coocurrencia.js"></script>
+<script src="../js/grafo/louvain.js"></script>
+<script src="../js/grafo/metricas.js"></script>
+<script src="../js/grafo/documentos.js"></script>
+<script src="../js/grafo/mixta.js"></script>
+<script src="../js/ui/formato.js"></script>
+<script src="../js/ui/colores.js"></script>
 <script src="casos.js"></script>
 <script src="casos-navegador.js"></script>
 <script>
@@ -72,6 +81,11 @@
   if (self.pdfjsLib && self.pdfjsLib.GlobalWorkerOptions) {
     self.pdfjsLib.GlobalWorkerOptions.workerSrc = '../vendor/pdf.worker.min.js';
   }
+
+  // Base de datos aparte: las pruebas no pueden tocar el índice real.
+  var BD_PRUEBAS = 'grafo-conocimiento-pruebas';
+  GC.almacen.usarBaseDeDatos(BD_PRUEBAS);
+  self.GC.bdPruebas = BD_PRUEBAS;
 
   var entorno = {
     muestra: async function (nombre) {
@@ -130,7 +144,7 @@
 
   document.getElementById('btn-correr').addEventListener('click', correr);
   document.getElementById('btn-limpiar').addEventListener('click', async function () {
-    if (!confirm('Se borra el índice guardado en este navegador. ¿Continuar?')) return;
+    if (!confirm('Se borra la base de datos de pruebas. El índice real no se toca.\n\n¿Continuar?')) return;
     await GC.almacen.borrarTodo();
     marcador.textContent = 'índice borrado';
   });
