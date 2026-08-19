@@ -1,0 +1,85 @@
+# Coeficientes de ventanas de decluster.
+#
+# ATENCION -- LEE ESTO ANTES DE USAR CUALQUIER VALOR DE ESTE ARCHIVO.
+#
+# Los valores numericos de este archivo NO fueron verificados contra las
+# publicaciones originales durante el desarrollo: el entorno de construccion
+# tenia el egreso de red bloqueado hacia los repositorios bibliograficos y
+# hacia los servicios sismologicos (ver docs/01-fuentes-verificadas.md).
+#
+# Por eso cada bloque lleva `verificado = false`. Mientras ese campo sea false:
+#
+#   * el codigo exige `permitir_no_verificado=True` para usarlos, y
+#   * toda Cantidad derivada queda marcada [DERIVADO/NO-VERIFICADO], y esa
+#     marca se propaga a todos los resultados aguas abajo.
+#
+# COMO VERIFICARLOS: abre la publicacion citada en `fuente`, localiza la tabla
+# indicada en `donde_verificar`, compara los cuatro coeficientes, corrige lo que
+# haga falta y pon `verificado = true` anotando la fecha en `verificado_el`.
+# No pongas `verificado = true` sin haber abierto el documento.
+
+# ---------------------------------------------------------------------------
+[gardner_knopoff]
+verificado = false
+verificado_el = ""
+fuente = "Gardner y Knopoff (1974), Bull. Seismol. Soc. Am."
+donde_verificar = "tabla de ventanas espacio-temporales en funcion de la magnitud"
+origen_del_valor = "forma funcional y coeficientes de uso comun; NO cotejados con el original"
+notas = """
+Ventanas deterministas: para un evento de magnitud M se declaran replicas todos
+los eventos posteriores dentro de un radio L(M) y un tiempo T(M).
+El metodo es sensible al orden de barrido y no tiene ninguna base fisica: es una
+regla de calibracion empirica sobre un catalogo de California de los anos 70.
+Aplicarla a un margen de subduccion es una extrapolacion fuera de calibracion.
+"""
+
+# L(M) = 10^(a_dist * M + b_dist), en kilometros
+a_dist = 0.1238
+b_dist = 0.983
+
+# T(M) = 10^(a_tiempo * M + b_tiempo), en dias, con dos regimenes de magnitud
+magnitud_quiebre = 6.5
+a_tiempo_bajo = 0.5409
+b_tiempo_bajo = -0.547
+a_tiempo_alto = 0.032
+b_tiempo_alto = 2.7389
+
+# ---------------------------------------------------------------------------
+[zaliapin_ben_zion]
+verificado = false
+verificado_el = ""
+fuente = "Zaliapin y Ben-Zion (2013), J. Geophys. Res.; Zaliapin et al. (2008), Phys. Rev. Lett."
+donde_verificar = "definicion de la distancia de vecino mas cercano y valores tipicos de d_fractal"
+origen_del_valor = "d_fractal de uso comun; b debe estimarse del propio catalogo"
+notas = """
+Distancia de vecino mas cercano en el espacio tiempo-distancia-magnitud:
+
+    eta_ij = t_ij * (r_ij)^d * 10^(-b * m_i)
+
+con t_ij en anios, r_ij en km, m_i la magnitud del evento anterior (el posible
+padre), d la dimension fractal del conjunto de epicentros y b el valor de
+Gutenberg-Richter. La separacion entre poblacion agrupada y poblacion de fondo
+se hace por el minimo del histograma bimodal de log10(eta), no por un umbral
+fijo. Si el histograma NO es bimodal, el metodo no aplica y el codigo lo dice.
+"""
+d_fractal = 1.6
+
+# ---------------------------------------------------------------------------
+[reasenberg]
+verificado = false
+verificado_el = ""
+fuente = "Reasenberg (1985), J. Geophys. Res."
+donde_verificar = "tabla de parametros del algoritmo de encadenamiento"
+origen_del_valor = "valores por defecto de uso comun; NO cotejados con el original"
+notas = """
+Encadenamiento de racimos por zona de interaccion. A diferencia de
+Gardner-Knopoff, la ventana temporal se adapta segun la probabilidad de
+observar el siguiente evento (modelo de Omori implicito), lo que lo hace menos
+arbitrario pero mas sensible a sus propios parametros.
+"""
+tau_min_dias = 1.0      # ventana minima de busqueda tras un evento
+tau_max_dias = 10.0     # ventana maxima de busqueda
+p_confianza = 0.95      # probabilidad de observar el siguiente evento del racimo
+r_factor = 10.0         # numero de radios de zona de interaccion
+m_efectiva_offset = 1.5 # magnitud de corte efectiva bajo el mayor del racimo
+radio_max_km = 30.0     # tope del radio de interaccion

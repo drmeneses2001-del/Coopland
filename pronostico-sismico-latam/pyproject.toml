@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sismolat"
+version = "0.1.0"
+description = "Pronostico sismico probabilistico y evaluacion de peligro para America Latina (docente e investigativo)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "pyarrow>=12.0",
+]
+
+[project.optional-dependencies]
+# pyCSEP es BSD-3-Clause: sin problema de licencia.
+csep = ["pycsep>=0.6"]
+# ATENCION: OpenQuake es AGPL-3.0. Si el servicio se expone por red, la AGPL
+# alcanza a todo el servicio. Ver docs/adr/0002-openquake-y-agpl.md antes de
+# instalar este extra. No se necesita para las fases 0-4.
+psha = ["openquake-engine>=3.19"]
+dev = ["pytest>=8.0", "pytest-cov"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["lento: pruebas que tardan minutos (recuperacion de parametros de ETAS)"]
