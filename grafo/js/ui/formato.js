@@ -9,6 +9,11 @@
 
   function numero(n) { return NUM.format(Math.round(n || 0)); }
 
+  // «llegaron 1 archivos» delata que nadie leyó el mensaje antes de enseñarlo.
+  function plural(n, singular, plural) {
+    return numero(n) + ' ' + (Math.abs(n) === 1 ? singular : (plural || singular + 's'));
+  }
+
   function bytes(n) {
     if (!n) return '0 B';
     var u = ['B', 'kB', 'MB', 'GB', 'TB'], i = 0, v = n;
@@ -48,5 +53,5 @@
     return '<span class="etiqueta ' + x.clase + '">' + escapar(x.texto) + '</span>';
   }
 
-  return { numero: numero, bytes: bytes, duracion: duracion, fecha: fecha, escapar: escapar, estado: estado, ETIQUETAS_ESTADO: ETIQUETAS_ESTADO };
+  return { numero: numero, plural: plural, bytes: bytes, duracion: duracion, fecha: fecha, escapar: escapar, estado: estado, ETIQUETAS_ESTADO: ETIQUETAS_ESTADO };
 });

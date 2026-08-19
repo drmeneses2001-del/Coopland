@@ -209,10 +209,27 @@
     V.rutas(estado.deteccion, estado.verificaciones, estado.rutaElegida);
     pintarAccionesIngesta();
     decir(funciona
-      ? 'ruta B verificada: ' + archivos.length + ' archivos con jerarquía de carpetas'
-      : 'ruta B NO funciona aquí: llegaron ' + archivos.length + ' archivos sin ruta relativa');
+      ? 'ruta B verificada: ' + F.plural(archivos.length, 'archivo') + ' con jerarquía de carpetas'
+      : 'ruta B NO funciona aquí: llegaron ' + F.plural(archivos.length, 'archivo') + ' sin ruta relativa');
 
-    if (funciona && confirm('La ruta B funciona: llegaron ' + archivos.length + ' archivos.\n\n¿Indexar ahora esta carpeta?')) {
+    if (!funciona) {
+      alert('La ruta B no funciona en este dispositivo.\n\n' +
+        'Llegaron ' + F.plural(archivos.length, 'archivo') + ', pero ninguno traía su ruta de carpeta. ' +
+        'La app usará de ahora en adelante la ruta C: archivos sueltos o un ZIP.');
+      return;
+    }
+
+    // Una carpeta con muy pocos archivos casi nunca es lo que el usuario cree
+    // haber elegido. En iPadOS la causa habitual es iCloud: los archivos que no
+    // están descargados en este dispositivo no llegan al selector.
+    var aviso = archivos.length < 3
+      ? '\n\nOjo: es muy poco para una carpeta de trabajo. Si esperabas más, ' +
+        'lo más probable es que el resto esté en iCloud sin descargar en este iPad. ' +
+        'Ábrela en la app Archivos y comprueba si los documentos tienen el icono de nube.'
+      : '';
+
+    if (confirm('La ruta B funciona: llegaron ' + F.plural(archivos.length, 'archivo') +
+                ' con su ruta de carpeta.' + aviso + '\n\n¿Indexar ahora esta carpeta?')) {
       await indexarInventario(GC.ingesta.inventarioDesdeArchivos(archivos, 'B'), 'carpeta (ruta B)');
     }
   }
@@ -259,7 +276,7 @@
   async function recorrerYIndexarA(handle) {
     decir('recorriendo la carpeta…');
     V.mostrar('bloque-progreso', true);
-    var inventario = await GC.ingesta.inventarioA(handle, function (n) { decir('recorriendo… ' + n + ' archivos'); });
+    var inventario = await GC.ingesta.inventarioA(handle, function (n) { decir('recorriendo… ' + F.plural(n, 'archivo')); });
     await indexarInventario(inventario, (handle.name || 'carpeta') + ' (ruta A)');
   }
 
@@ -322,7 +339,7 @@
     V.mostrar('bloque-progreso', true);
 
     var resumenIngesta = GC.ingesta.resumirInventario(inventario);
-    decir('indexando ' + F.numero(resumenIngesta.total) + ' archivos · ' + F.bytes(resumenIngesta.bytes));
+    decir('indexando ' + F.plural(resumenIngesta.total, 'archivo') + ' · ' + F.bytes(resumenIngesta.bytes));
 
     try {
       var r = await GC.indexador.indexar({
@@ -340,7 +357,8 @@
       decir('índice al día · ' + F.numero(r.analizados) + ' analizados, ' +
             F.numero(r.sinCambios) + ' sin cambios, ' + F.duracion(r.duracionMs));
       if (resumenIngesta.noDescargados) {
-        decir('índice al día · atención: ' + resumenIngesta.noDescargados + ' archivos no están descargados de iCloud');
+        decir('índice al día · atención: ' + F.plural(resumenIngesta.noDescargados, 'archivo') +
+              ' sin descargar de iCloud, sólo está su marcador en el iPad');
       }
       estado.trabajando = false;
       await construirGrafo(true);
