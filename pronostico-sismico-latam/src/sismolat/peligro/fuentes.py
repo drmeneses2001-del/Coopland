@@ -20,6 +20,13 @@ en la cola del peligro. No hay forma de estimarlo bien con catalogos de decadas.
 Por eso :class:`DistribucionMagnitudes` lo exige como :class:`Cantidad` con
 procedencia declarada, y la forma correcta de usarlo es como **rama del arbol
 logico** (varios valores con pesos), no como un numero.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No modela fallas con geometria finita ni rupturas extensas: toda fuente se
+  discretiza en puntos. Para magnitudes grandes eso distorsiona las distancias.
+* No deduce la geometria de ninguna base de datos de fallas: hay que darsela.
+* No estima m_max ni la tasa. Los recibe como Cantidad con procedencia, y de la
+  calidad de esa procedencia depende todo lo que salga.
 """
 
 from __future__ import annotations

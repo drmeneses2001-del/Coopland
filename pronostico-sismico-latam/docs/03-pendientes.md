@@ -59,18 +59,21 @@ independiente de la cita.
 El parseo se probó contra respuestas de ejemplo con el formato del estándar. Es
 plausible que un servicio concreto devuelva variantes que el parser no maneje.
 
-## Fuera del alcance acordado (fases 0–4)
+## Las ocho fases están implementadas
 
-No implementado, por acuerdo explícito:
+Lo que queda pendiente dentro de cada una está en la tabla de la sección
+siguiente. Dos limitaciones estructurales merecen destacarse aquí:
 
-- **Fase 5 — PSHA**: Cornell-McGuire, árboles lógicos, GMM, desagregación,
-  efecto de sitio.
-- **Fase 6 — Coulomb** (Okada) y presupuesto geodésico de momento.
-- **Fase 7 — hipótesis exploratorias** (mareas, clima, embalses). La
-  infraestructura de preregistro y corrección por multiplicidad
-  (`RegistroDePruebas`) **sí está construida y probada**, porque la necesitaba
-  la fase 4.
-- **Fase 8 — capa de lenguaje natural y didáctica.**
+- **Fase 6 — no se usa la solución de semiespacio de Okada.** Se parte de la
+  solución de Kelvin en medio infinito, que puede derivarse y verificarse
+  numéricamente, en lugar de reproducir de memoria fórmulas que no se pueden
+  cotejar. El coste es que **no hay superficie libre**, lo cual es de primer
+  orden para fuentes someras. El módulo cuantifica ese error en lugar de
+  ocultarlo (`error_de_superficie_libre`).
+- **Fase 8 — la capa de lenguaje no puede citar literatura verificable.** Hacerlo
+  requiere recuperar primero y resolver cada DOI, y el egreso de red hacia los
+  repositorios bibliográficos está bloqueado. La función que redacta
+  interpretaciones sí está completa y con verificación mecánica de cifras.
 
 ## Implementado parcialmente
 
@@ -82,6 +85,9 @@ No implementado, por acuerdo explícito:
 | **Ley de Båth** | Implementada con su diagnóstico de sesgo, no como predictor |
 | **Frontend** | No existe. El paquete es una biblioteca de Python |
 | **Almacenamiento PostgreSQL/PostGIS** | No. Se usa Parquet para instantáneas |
+| **Rupturas finitas en PSHA** | No. Toda fuente se discretiza en puntos; para M grandes eso distorsiona las distancias |
+| **Superficie libre en el cálculo elástico** | No. Ver arriba; el error se cuantifica pero no se corrige |
+| **Resumen de literatura con citas verificadas** | No. Requiere resolución de DOI contra red |
 
 ## Deuda técnica conocida
 

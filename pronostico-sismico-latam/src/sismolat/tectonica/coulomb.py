@@ -40,6 +40,16 @@ tras la ruptura. El disparo **dinamico** —por el paso de las ondas sismicas—
 un mecanismo distinto, actua a distancias mucho mayores, es transitorio y no se
 modela aqui. Atribuir a transferencia estatica un disparo a cientos de
 kilometros es un error de mecanismo.
+Lo que este modulo NO puede hacer
+---------------------------------
+* Hereda todas las limitaciones de :mod:`sismolat.tectonica.elastico`: medio
+  infinito sin superficie libre, homogeneo y sin topografia.
+* No modela disparo dinamico, que es un mecanismo distinto (ver arriba).
+* No sabe si la falla receptora estaba proxima a romper. Sin eso, un delta_CFS
+  positivo no implica adelanto de la ruptura: implica que el esfuerzo cambio en
+  esa direccion.
+* No estima el modelo de deslizamiento de la fuente, cuya incertidumbre suele
+  dominar el resultado y rara vez se publica.
 """
 
 from __future__ import annotations

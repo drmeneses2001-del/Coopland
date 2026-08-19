@@ -24,6 +24,15 @@ Coeficientes
 ------------
 Los coeficientes de las ventanas se cargan de ``parametros/ventanas_decluster.toml``
 y estan marcados como **no verificados**. Ver la cabecera de ese archivo.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No existe una particion verdadera que descubrir, asi que no hay forma de
+  validar cual de los tres metodos "acierta". Solo se puede comparar cuanto
+  difieren.
+* No adapta las ventanas a la region. Los coeficientes vienen de calibraciones
+  hechas en otros margenes tectonicos y aplicarlos aqui es extrapolar.
+* No identifica secuencias de enjambre ni sismicidad inducida, que no encajan en
+  el modelo principal-replica sobre el que se construyen los tres algoritmos.
 """
 
 from __future__ import annotations

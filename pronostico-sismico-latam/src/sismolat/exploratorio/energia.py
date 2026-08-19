@@ -43,6 +43,15 @@ De ahi se sigue lo que se puede y no se puede afirmar:
 
 Esta distincion —entre modulacion marginal del momento de ruptura y causacion—
 es la que separa una hipotesis falsable de la pseudociencia.
+Lo que este modulo NO puede hacer
+---------------------------------
+* Todos sus valores son ESTIMACIONES de orden de magnitud, no mediciones.
+  Sirven para comparar potencias de diez y nada mas.
+* No calcula el esfuerzo real en ningun sitio concreto. La transmision de una
+  carga superficial a profundidad depende de la geometria, la estructura y la
+  difusion de presion de poro, y aqui se trata como si fuera directa.
+* No sustituye a un analisis de sismicidad inducida, que requiere modelar la
+  hidrogeologia del emplazamiento.
 """
 
 from __future__ import annotations

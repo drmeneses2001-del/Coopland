@@ -43,7 +43,7 @@ motor numérico auditable a la espera de que alguien audite la ciencia.
 
 ## Estado actual
 
-**Fases 0–4 implementadas y validadas.** Fases 5–8 fuera del alcance acordado.
+**Las ocho fases implementadas y validadas.**
 
 | Fase | Contenido | Estado |
 |---|---|---|
@@ -52,9 +52,12 @@ motor numérico auditable a la espera de que alguien audite la ciencia.
 | 2 | Mc (3 métodos + espacial + temporal), valor b, decluster (3 métodos) | ✅ |
 | 3 | Omori–Utsu, Båth, ETAS temporal y **espacio-temporal** (MLE + simulación), sismicidad suavizada | ✅ |
 | 4 | CSEP (N/L/CL/S/M, poissoniano y basado en catálogo), ganancia de información, Molchan, ROC, Brier | ✅ |
-| 5–8 | PSHA, Coulomb, hipótesis exploratorias, capa de lenguaje | ❌ no implementadas |
+| 5 | PSHA: Cornell–McGuire, árbol lógico, desagregación, GMM verificados, efecto de sitio | ✅ |
+| 6 | Dislocación elástica, transferencia de Coulomb, presupuesto geodésico de momento | ✅ |
+| 7 | Hipótesis exploratorias con preregistro, estadística circular, panel de resultado nulo | ✅ |
+| 8 | Capa de lenguaje con verificación de cifras, revisor metodológico, paneles didácticos | ✅ |
 
-**151 pruebas, todas en verde** (144 rápidas + 7 lentas de recuperación y calibración).
+**330 pruebas, todas en verde** (323 rápidas + 7 lentas de recuperación y calibración).
 
 ### ⚠️ Advertencia sobre la Fase 1
 
@@ -192,7 +195,44 @@ El ancho del núcleo se elige por verosimilitud **dentro del entrenamiento**;
 `optimizar_ancho` no recibe el periodo de prueba, así que la salvaguarda contra
 la fuga es estructural, no una comprobación posterior.
 
-### 7. Se declara lo que el software no puede garantizar
+### 7. Los modelos de movimiento del terreno no se recodifican
+
+Codificar un GMM a mano desde las tablas de un artículo es la principal fuente de
+errores silenciosos posible en un cálculo de peligro: un signo, un término de
+saturación o una unidad producen un número plausible y equivocado. El paquete
+envuelve las **967 implementaciones verificadas de `openquake.hazardlib`** — entre
+ellas `ArroyoEtAl2010SInter` y `GarciaEtAl2005SSlab`, calibradas para México — y
+se niega a aplicar un GMM fuera de su régimen tectónico o sin justificación
+regional escrita.
+
+Por la misma razón, la Fase 6 **no** reproduce las fórmulas de semiespacio de
+Okada: parte de la solución de Kelvin, que puede derivarse y verificarse
+numéricamente, y **cuantifica el error** que introduce no tener superficie libre
+en lugar de ocultarlo.
+
+### 8. La capa de lenguaje no puede inventar una cifra
+
+La restricción de que el modelo no participe en el cálculo no se pide en el
+prompt: se comprueba. Toda cifra del texto generado debe ser trazable a los
+números que produjo el motor numérico.
+
+```
+>>> exigir_cifras_trazables("El PGA es 0.0089 g, con intensidad MMI 6.4", datos)
+ErrorDeCifraNoTrazable: 1 de 2 cifras no provienen del motor numérico: 6.4.
+El texto no debe mostrarse.
+```
+
+El revisor metodológico es **determinista**: fuga temporal, pruebas múltiples,
+parámetros no verificados y extrapolación los detecta el código. La capa de
+lenguaje solo los narra — y declara explícitamente lo que no cubre.
+
+### 9. Los paneles didácticos salen del código, y se auditan
+
+Cada módulo documenta en su docstring la matemática, los datos y **lo que no
+puede hacer**. `auditar_paneles()` recorre el paquete y lista los que no declaran
+sus límites; una prueba falla si aparece alguno. Hoy son **28 de 28**.
+
+### 10. Se declara lo que el software no puede garantizar
 
 `verificar_corte_temporal` detecta fuga **por marcas de tiempo** y lo dice: la
 fuga por selección de modelo tras haber visto el catálogo completo es indecidible

@@ -7,6 +7,15 @@ unidad y procedencia, y las procedencias que afirman respaldo empirico exigen
 ademas una fuente citable.
 
 La motivacion esta desarrollada en docs/00-contrato-epistemologico.md.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No comprueba que la fuente citada diga lo que la cantidad afirma. Exige que
+  haya una cita; que sea correcta es responsabilidad de quien la escribe.
+* No hace analisis dimensional: ``unidad`` es una cadena, no un tipo. Sumar
+  metros con segundos no da error aqui.
+* No propaga incertidumbre automaticamente en operaciones aritmeticas. Es
+  deliberado: :class:`Cantidad` no define suma ni producto para que nadie
+  encadene operaciones perdiendo la procedencia por el camino.
 """
 
 from __future__ import annotations

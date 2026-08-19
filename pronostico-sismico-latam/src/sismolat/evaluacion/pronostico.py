@@ -21,6 +21,14 @@ Por eso :meth:`PronosticoRejilla.desde_simulaciones` exige declarar
 explicitamente que se acepta el supuesto de Poisson, y las pruebas del modulo
 :mod:`sismolat.evaluacion.csep` rechazan aplicar la version poissoniana a un
 pronostico basado en catalogo.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No juzga si un pronostico es bueno: solo lo representa en la forma que las
+  pruebas necesitan. La bandera ``poisson_valido`` la declara quien construye
+  el pronostico, y el codigo no puede verificar que sea cierta.
+* No comprueba que la rejilla sea adecuada. Una rejilla demasiado gruesa
+  esconde estructura espacial y una demasiado fina deja celdas vacias; elegir
+  el tamano es una decision del analista.
 """
 
 from __future__ import annotations

@@ -10,6 +10,16 @@ Decisiones de diseno que responden al contrato epistemologico:
   hacen ruidoso.
 * Cada evento arrastra la agencia que lo aporto, de modo que un analisis puede
   reconstruir de donde salio cada numero.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No corrige el catalogo. Detecta problemas de esquema y avisa de riesgos
+  conocidos; reparar hipocentros, magnitudes o duplicados es trabajo de la capa
+  de ingesta y, en ultimo termino, de la agencia.
+* No juzga si el catalogo es adecuado para el analisis que se pretende. Un
+  catalogo bien formado puede ser demasiado corto, demasiado incompleto o de la
+  region equivocada, y nada de eso dispara una advertencia.
+* No detecta errores de localizacion ni magnitudes mal calculadas: solo ve lo
+  que la agencia publico.
 """
 
 from __future__ import annotations

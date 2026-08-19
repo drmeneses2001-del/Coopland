@@ -15,6 +15,14 @@ Mc*, las magnitudes verdaderas deben generarse desde ``Mc - dm/2``, no desde
 ``Mc + dm/2`` y hace que el estimador de Aki-Utsu parezca sesgado cuando no lo
 esta. Esta sutileza es la razon de que este generador viva en el paquete y no
 suelto en los tests.
+Lo que este modulo NO puede hacer
+---------------------------------
+* Los catalogos sinteticos **no son datos**. Sirven para validar estimadores, no
+  para sacar conclusiones sobre ninguna region real.
+* No reproducen la heterogeneidad de completitud de un catalogo real, que es
+  precisamente el problema que mas sesga los estimadores en la practica. Un
+  estimador que funciona aqui puede fallar con datos reales por esa razon.
+* El fondo espacial por defecto es uniforme, cosa que ningun catalogo real es.
 """
 
 from __future__ import annotations

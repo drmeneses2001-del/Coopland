@@ -14,6 +14,14 @@ casos, e incluye siempre:
 * el tamano de efecto antes que el p-valor,
 * la potencia, sin la cual un no rechazo no significa nada,
 * una lectura explicita de lo que el resultado permite y no permite afirmar.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No juzga si la hipotesis merece probarse. Registra y presenta; que la pregunta
+  tenga sentido fisico es responsabilidad de quien la formula, y para eso esta
+  el modulo de escalas de esfuerzo.
+* No impide preregistrar cincuenta hipotesis y quedarse con una. Lo que hace es
+  que las cincuenta queden contadas y el umbral corregido lo refleje.
+* No detecta que dos hipotesis preregistradas sean la misma con otras palabras.
 """
 
 from __future__ import annotations

@@ -23,6 +23,15 @@ Un aviso practico: los fractiles del arbol **no son intervalos de confianza**.
 Son cuantiles de una distribucion construida a partir de juicios, y su anchura
 depende tanto de cuantas ramas se pusieron como de cuanta incertidumbre real
 hay. Anadir ramas parecidas estrecha los fractiles sin reducir la ignorancia.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No valida los pesos. Que sumen 1 es lo unico comprobable; que expresen
+  credibilidad relativa razonable es juicio experto y el codigo no lo juzga.
+* No detecta ramas correlacionadas. Dos GMM casi identicos con pesos
+  independientes cuentan como dos alternativas y estrechan artificialmente los
+  fractiles.
+* No completa el arbol: si falta una fuente de incertidumbre epistemica
+  relevante, el resultado parecera mejor restringido de lo que esta.
 """
 
 from __future__ import annotations

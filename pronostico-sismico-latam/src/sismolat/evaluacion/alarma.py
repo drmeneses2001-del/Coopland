@@ -25,6 +25,16 @@ El Brier score y el diagrama de confiabilidad requieren un evento binario. La
 definicion (magnitud umbral, tamano de celda, ventana temporal) **cambia el
 resultado** y debe fijarse antes de mirar los datos. :class:`EventoObjetivo`
 la hace explicita y la arrastra a todos los resultados.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No propone alarmas ni umbrales de accion. Mide poder discriminante; convertir
+  eso en una decision operativa exige un analisis de costes y consecuencias que
+  esta fuera del alcance de esta biblioteca y, sobre todo, fuera del de un
+  calculo estadistico.
+* No pondera las consecuencias. Un fallo y una falsa alarma cuentan igual en
+  estas curvas, y en la realidad no cuestan lo mismo.
+* No corrige por el hecho de que el conjunto de alarma se haya elegido mirando
+  los mismos datos con los que se evalua.
 """
 
 from __future__ import annotations

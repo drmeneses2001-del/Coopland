@@ -32,6 +32,14 @@ Advertencias estructurales
 * La **autocorrelacion** de ambas series reduce el numero efectivo de datos
   independientes muy por debajo de N. El p-valor nominal es entonces
   demasiado optimista, y por eso se ofrece el p por permutacion en bloques.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No establece causalidad, ni siquiera cuando el efecto es grande y robusto.
+* No corrige por confusores mas alla de avisar de la estacionalidad. Si la
+  completitud del catalogo covaria con la variable ambiental, el metodo no
+  puede separarlas.
+* No prueba mecanismos. Antes de interpretar cualquier resultado, mira el orden
+  de magnitud del esfuerzo involucrado en :mod:`sismolat.exploratorio.energia`.
 """
 
 from __future__ import annotations

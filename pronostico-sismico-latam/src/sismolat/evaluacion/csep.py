@@ -22,6 +22,15 @@ Ademas, aplicar las cinco pruebas a varios modelos multiplica las
 comparaciones. Registra cada prueba en
 :class:`~sismolat.reproducibilidad.RegistroDePruebas` y corrige por
 multiplicidad antes de declarar que un modelo "fallo".
+Lo que este modulo NO puede hacer
+---------------------------------
+* No dice si un modelo es **util**. Las pruebas de consistencia responden si el
+  dato es compatible con el modelo, y un modelo suficientemente vago pasa todas.
+  Para utilidad esta :func:`ganancia_informacion`.
+* No corrige por multiplicidad entre pruebas ni entre modelos. Aplicar cinco
+  pruebas a tres modelos son quince comparaciones, y ese conteo lo lleva
+  :class:`~sismolat.reproducibilidad.RegistroDePruebas`, no este modulo.
+* No verifica que el pronostico se construyera sin ver el periodo de prueba.
 """
 
 from __future__ import annotations

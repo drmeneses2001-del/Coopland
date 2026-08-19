@@ -32,6 +32,15 @@ Un resultado no significativo **no dice nada** sin la potencia. Con N pequeno,
 no rechazar el nulo es lo esperable aunque el efecto exista.
 :func:`potencia_schuster` la calcula por simulacion, y el panel de resultado
 nulo la exige.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No calcula esfuerzo de marea. Eso requiere efemerides y numeros de Love, que
+  este paquete no incluye; hay que pasarle la fase ya calculada.
+* No establece causalidad. Una fase preferente significativa dice que la
+  ocurrencia no es uniforme respecto a ese ciclo, no que el ciclo la cause.
+* No corrige por confusores. Si la deteccion del catalogo varia con la hora del
+  dia --y suele hacerlo, por el ruido antropico-- aparecera una fase preferente
+  que es del catalogo, no de la Tierra.
 """
 
 from __future__ import annotations

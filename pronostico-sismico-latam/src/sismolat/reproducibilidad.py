@@ -13,6 +13,15 @@ Contiene tres piezas que el resto de la biblioteca usa:
    declarado de :class:`BitacoraDeDecisiones`.
 3. :class:`RegistroDePruebas` -- contador de hipotesis probadas con correccion
    por multiplicidad a nivel de proyecto, no de sesion.
+Lo que este modulo NO puede hacer
+---------------------------------
+* No detecta la fuga por seleccion (ver arriba): es indecidible desde el codigo.
+* La huella no cubre el entorno completo. Dos corridas con el mismo
+  identificador pero distintas versiones de NumPy o SciPy pueden diferir en los
+  ultimos digitos. Para reproducibilidad estricta hace falta fijar el entorno.
+* El registro de pruebas no puede impedir que alguien analice fuera de el. Su
+  cadena de hashes es una barrera contra el auto-engano, no contra un adversario
+  con acceso al archivo.
 """
 
 from __future__ import annotations
