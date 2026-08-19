@@ -60,6 +60,7 @@ from .omori import integral_omori
 __all__ = [
     "ParametrosETAS", "AjusteETAS", "intensidad_etas",
     "ajustar_etas", "simular_etas", "simular_espacio_temporal", "fondo_de_mezcla",
+    "ParametrosEspaciales", "AjusteETASEspacial", "ajustar_etas_espacial",
 ]
 
 
@@ -549,3 +550,375 @@ def simular_espacio_temporal(
         "concentracion espacial del catalogo simulado y debe reportarse."
     )
     return salida
+
+
+# ---------------------------------------------------------------------------
+# ETAS espacio-temporal: estimacion de parametros
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ParametrosEspaciales:
+    """Parametros del nucleo espacial de ETAS.
+
+    .. math::
+        f(r \\mid m) = \\frac{q-1}{\\pi D(m)}
+            \\left(1 + \\frac{r^2}{D(m)}\\right)^{-q},
+        \\quad D(m) = d^2 e^{\\gamma (m - m_0)}
+
+    ``d`` esta en km, ``q`` es el exponente de la cola (``q > 1``) y ``gamma``
+    controla cuanto se ensancha la zona de replicas con la magnitud del padre.
+
+    El nucleo se **trunca y renormaliza** en ``r_max_km``: con ``q <= 1.5`` la
+    distancia radial tiene media infinita, asi que el truncamiento no es un
+    refinamiento sino parte de la definicion del modelo. Debe ser el mismo valor
+    en simulacion y en estimacion, y reportarse con los resultados.
+    """
+
+    d_km: float
+    q: float
+    gamma: float
+    r_max_km: float = 200.0
+
+    def escala2(self, m: np.ndarray, m0: float) -> np.ndarray:
+        """D(m) en km^2."""
+        return self.d_km ** 2 * np.exp(self.gamma * (np.asarray(m, float) - m0))
+
+    def densidad(self, r_km: np.ndarray, m: np.ndarray, m0: float) -> np.ndarray:
+        """Densidad espacial normalizada dentro de ``r_max_km`` (unidades 1/km^2)."""
+        D = self.escala2(m, m0)
+        cruda = (self.q - 1.0) / (math.pi * D) * (1.0 + np.asarray(r_km, float) ** 2 / D) ** (-self.q)
+        masa = 1.0 - (1.0 + self.r_max_km ** 2 / D) ** (1.0 - self.q)
+        return cruda / masa
+
+    def radio_mediano_km(self, m: float, m0: float) -> float:
+        """Radio que contiene la mitad de las replicas de un evento de magnitud m."""
+        D = float(self.escala2(np.array([m]), m0)[0])
+        masa = 1.0 - (1.0 + self.r_max_km ** 2 / D) ** (1.0 - self.q)
+        return math.sqrt(D * ((1.0 - 0.5 * masa) ** (1.0 / (1.0 - self.q)) - 1.0))
+
+
+@dataclass(frozen=True)
+class AjusteETASEspacial:
+    """Resultado del ajuste de ETAS espacio-temporal."""
+
+    temporales: ParametrosETAS
+    espaciales: ParametrosEspaciales
+    cantidades: dict[str, Cantidad]
+    log_verosimilitud: float
+    n: int
+    area_km2: float
+    ventana: tuple[float, float]
+    t_inicio_ajuste: float
+    n_pares: int
+    convergio: bool
+    fijos: tuple[str, ...]
+    advertencias: list[str] = field(default_factory=list)
+
+    def __str__(self) -> str:
+        t, e = self.temporales, self.espaciales
+        estado = "" if self.convergio else "  [NO CONVERGIO]"
+        fij = f" (fijos: {', '.join(self.fijos)})" if self.fijos else ""
+        return (f"ETAS espacio-temporal (n={self.n}, {self.n_pares} pares): "
+                f"mu={t.mu:.4g}/d K={t.K:.4g} alpha={t.alpha:.3g} c={t.c:.4g} p={t.p:.3g} "
+                f"d={e.d_km:.3g}km q={e.q:.3g} gamma={e.gamma:.3g}{fij}{estado}")
+
+
+_RADIO_TIERRA_KM = 6371.0
+
+
+def _pares_vecinos(
+    t: np.ndarray, lon: np.ndarray, lat: np.ndarray,
+    ventana_dias: float, r_max_km: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Pares (hijo j, padre i) dentro de las ventanas temporal y espacial.
+
+    Truncar la influencia es necesario para que el ajuste sea tratable: sin
+    truncar, la verosimilitud es O(n^2) en cada evaluacion del optimizador. Las
+    ventanas son **[SUPUESTO] declarado** y deben elegirse holgadas respecto a la
+    escala real del disparo; si son demasiado estrechas, se pierde parte de la
+    productividad y ``K`` sale sesgado hacia abajo.
+    """
+    n = t.size
+    js, iss, dts, rs = [], [], [], []
+    lat_r = np.radians(lat)
+    lon_r = np.radians(lon)
+    for j in range(1, n):
+        ini = int(np.searchsorted(t, t[j] - ventana_dias, side="left"))
+        if ini >= j:
+            continue
+        idx = np.arange(ini, j)
+        dt = t[j] - t[idx]
+        valido = dt > 0
+        if not valido.any():
+            continue
+        idx, dt = idx[valido], dt[valido]
+        dlat = lat_r[j] - lat_r[idx]
+        dlon = lon_r[j] - lon_r[idx]
+        a = np.sin(dlat / 2) ** 2 + np.cos(lat_r[idx]) * np.cos(lat_r[j]) * np.sin(dlon / 2) ** 2
+        r = 2 * _RADIO_TIERRA_KM * np.arcsin(np.sqrt(np.clip(a, 0, 1)))
+        cerca = r <= r_max_km
+        if not cerca.any():
+            continue
+        js.append(np.full(int(cerca.sum()), j))
+        iss.append(idx[cerca])
+        dts.append(dt[cerca])
+        rs.append(r[cerca])
+    if not js:
+        vacio = np.array([], dtype=int)
+        return vacio, vacio, np.array([]), np.array([])
+    return (np.concatenate(js), np.concatenate(iss),
+            np.concatenate(dts), np.concatenate(rs))
+
+
+_NOMBRES_ESPACIAL = ("mu", "K", "alpha", "c", "p", "d_km", "q", "gamma")
+
+
+def _empaquetar(vals: dict[str, float]) -> np.ndarray:
+    """Pasa a la escala en que optimiza el algoritmo (logaritmica salvo alpha y gamma)."""
+    return np.array([
+        math.log(vals["mu"]), math.log(vals["K"]), vals["alpha"], math.log(vals["c"]),
+        math.log(vals["p"]), math.log(vals["d_km"]), math.log(vals["q"] - 1.0), vals["gamma"],
+    ])
+
+
+def _desempaquetar(x: np.ndarray) -> dict[str, float]:
+    return {
+        "mu": math.exp(x[0]), "K": math.exp(x[1]), "alpha": x[2], "c": math.exp(x[3]),
+        "p": math.exp(x[4]), "d_km": math.exp(x[5]), "q": 1.0 + math.exp(x[6]),
+        "gamma": x[7],
+    }
+
+
+def _mll_espacial(
+    x: np.ndarray, t: np.ndarray, m: np.ndarray, m0: float, area_km2: float,
+    t_ini: float, t_fin: float, pj: np.ndarray, pi: np.ndarray,
+    pdt: np.ndarray, pr: np.ndarray, r_max_km: float,
+) -> float:
+    """-log L de ETAS espacio-temporal con nucleo truncado."""
+    v = _desempaquetar(x)
+    mu, K, alpha, c, p = v["mu"], v["K"], v["alpha"], v["c"], v["p"]
+    d_km, q, gamma = v["d_km"], v["q"], v["gamma"]
+    if not (0.05 < p < 5.0) or not (-1.0 < alpha < 6.0) or c > 10.0:
+        return 1e12
+    if not (1.001 < q < 6.0) or not (0.01 < d_km < 500.0) or not (-1.0 < gamma < 4.0):
+        return 1e12
+
+    prod = K * np.exp(alpha * (m - m0))
+
+    # --- termino de suma: log lambda en cada evento de la ventana de ajuste ---
+    D = d_km ** 2 * np.exp(gamma * (m - m0))          # por evento padre
+    masa = 1.0 - (1.0 + r_max_km ** 2 / D) ** (1.0 - q)
+    if np.any(masa <= 0) or not np.all(np.isfinite(masa)):
+        return 1e12
+
+    Dp = D[pi]
+    dens = ((q - 1.0) / (math.pi * Dp)) * (1.0 + pr ** 2 / Dp) ** (-q) / masa[pi]
+    aporte = prod[pi] * np.power(pdt + c, -p) * dens
+
+    lam = np.full(t.size, mu / area_km2, dtype=float)
+    np.add.at(lam, pj, aporte)
+    sel = t >= t_ini
+    if not sel.any():
+        return 1e12
+    lam_sel = lam[sel]
+    if np.any(lam_sel <= 0) or not np.all(np.isfinite(lam_sel)):
+        return 1e12
+    suma = float(np.sum(np.log(lam_sel)))
+
+    # --- termino integral: identico al temporal, porque el nucleo espacial
+    #     integra a 1 sobre el disco de radio r_max ---
+    integral = mu * (t_fin - t_ini)
+    desde = np.maximum(t_ini - t, 0.0)
+    hasta = t_fin - t
+    activo = hasta > desde
+    if activo.any():
+        if abs(p - 1.0) < 1e-10:
+            I = np.log((hasta[activo] + c) / (desde[activo] + c))
+        else:
+            I = ((hasta[activo] + c) ** (1.0 - p) - (desde[activo] + c) ** (1.0 - p)) / (1.0 - p)
+        integral += float(np.sum(prod[activo] * I))
+
+    ll = suma - integral
+    return -ll if math.isfinite(ll) else 1e12
+
+
+def ajustar_etas_espacial(
+    tiempos_dias: np.ndarray,
+    magnitudes: np.ndarray,
+    lon: np.ndarray,
+    lat: np.ndarray,
+    m0: float,
+    area_km2: float,
+    *,
+    t_fin: float | None = None,
+    t_inicio_ajuste: float | None = None,
+    r_max_km: float = 200.0,
+    ventana_dias: float = 1000.0,
+    inicial: dict[str, float] | None = None,
+    fijos: dict[str, float] | None = None,
+    b_para_ramificacion: float = 1.0,
+    max_iteraciones: int = 40000,
+) -> AjusteETASEspacial:
+    """Estima los ocho parametros de ETAS espacio-temporal por maxima verosimilitud.
+
+    Parametros estimados: ``mu, K, alpha, c, p, d_km, q, gamma``. Cualquiera
+    puede fijarse pasandolo en ``fijos``, lo que reduce la dimension del problema
+    y suele ser necesario en la practica.
+
+    Estrategia de arranque
+    ----------------------
+    Ocho parametros con verosimilitud no convexa es un problema duro. Por defecto
+    se hace en tres etapas: primero se ajusta la parte temporal ignorando el
+    espacio, despues los tres parametros espaciales con la temporal fija, y por
+    ultimo un refinamiento conjunto. Arrancar directamente en ocho dimensiones
+    desde un punto arbitrario suele acabar en un optimo local.
+
+    Supuestos que afectan al resultado
+    ----------------------------------
+    * **Fondo uniforme** de densidad ``mu / area_km2``. La sismicidad de fondo
+      real es fuertemente heterogenea; con fondo uniforme, la parte del
+      agrupamiento espacial que en realidad es estructura del fondo se atribuye
+      al disparo, lo que **sesga los parametros espaciales hacia zonas de
+      replicas mas concentradas**. Para uso serio hay que estimar el fondo
+      conjuntamente (algoritmo de adelgazamiento estocastico) o darlo como mapa.
+    * **Sin efecto de borde**: el termino integral supone que todo el disco de
+      radio ``r_max_km`` alrededor de cada evento cae dentro de la region. Para
+      eventos cerca del limite eso es falso, y ``K`` sale sesgado hacia abajo.
+    * **Ventanas de truncamiento** ``ventana_dias`` y ``r_max_km`` son
+      [SUPUESTO]: si son estrechas se pierde productividad y ``K`` baja.
+    """
+    t = np.asarray(tiempos_dias, dtype=float)
+    m = np.asarray(magnitudes, dtype=float)
+    x = np.asarray(lon, dtype=float)
+    y = np.asarray(lat, dtype=float)
+    if not (t.size == m.size == x.size == y.size):
+        raise ValueError("tiempos, magnitudes, lon y lat deben tener la misma longitud")
+    orden = np.argsort(t)
+    t, m, x, y = t[orden], m[orden], x[orden], y[orden]
+    ok = np.isfinite(t) & np.isfinite(m) & np.isfinite(x) & np.isfinite(y) & (m >= m0 - 1e-9)
+    t, m, x, y = t[ok], m[ok], x[ok], y[ok]
+    if t.size < 100:
+        raise ValueError(
+            f"solo {t.size} eventos sobre m0={m0:g}; el ajuste espacio-temporal tiene ocho "
+            "parametros y necesita bastantes mas para que esten identificados"
+        )
+    if area_km2 <= 0:
+        raise ValueError("area_km2 debe ser positiva")
+
+    t0 = float(t[0])
+    t_fin = float(t[-1]) if t_fin is None else float(t_fin)
+    if t_inicio_ajuste is None:
+        t_inicio_ajuste = t0 + 0.05 * (t_fin - t0)
+
+    pj, pi, pdt, pr = _pares_vecinos(t, x, y, ventana_dias, r_max_km)
+    if pj.size == 0:
+        raise ValueError(
+            f"ningun par de eventos cae dentro de ventana_dias={ventana_dias:g} y "
+            f"r_max_km={r_max_km:g}. Amplia las ventanas."
+        )
+
+    fijos = dict(fijos or {})
+    desconocidos = set(fijos) - set(_NOMBRES_ESPACIAL)
+    if desconocidos:
+        raise ValueError(f"parametros desconocidos en fijos: {sorted(desconocidos)}")
+    if len(fijos) == len(_NOMBRES_ESPACIAL):
+        raise ValueError("se fijaron los ocho parametros: no queda nada que estimar")
+
+    partida = {
+        "mu": max(t.size / (t_fin - t0) * 0.5, 1e-4), "K": 0.02, "alpha": 1.5,
+        "c": 0.01, "p": 1.15, "d_km": 5.0, "q": 1.6, "gamma": 0.5,
+    }
+    partida.update(inicial or {})
+    partida.update(fijos)
+
+    libres = [k for k in _NOMBRES_ESPACIAL if k not in fijos]
+    idx_libres = [_NOMBRES_ESPACIAL.index(k) for k in libres]
+
+    def objetivo(v_libres: np.ndarray, activos: list[int]) -> float:
+        completo = _empaquetar(partida).copy()
+        completo[activos] = v_libres
+        return _mll_espacial(completo, t, m, m0, area_km2, float(t_inicio_ajuste),
+                             t_fin, pj, pi, pdt, pr, r_max_km)
+
+    def optimizar(nombres: list[str], iteraciones: int) -> None:
+        activos = [_NOMBRES_ESPACIAL.index(k) for k in nombres if k not in fijos]
+        if not activos:
+            return
+        x0 = _empaquetar(partida)[activos]
+        res = optimize.minimize(
+            objetivo, x0, args=(activos,), method="Nelder-Mead",
+            options={"xatol": 1e-6, "fatol": 1e-6,
+                     "maxiter": iteraciones, "maxfev": iteraciones},
+        )
+        completo = _empaquetar(partida).copy()
+        completo[activos] = res.x
+        partida.update(_desempaquetar(completo))
+        partida.update(fijos)
+        objetivo.ultimo = res  # type: ignore[attr-defined]
+
+    # Tres etapas: temporal -> espacial -> conjunta.
+    optimizar(["mu", "K", "alpha", "c", "p"], max_iteraciones // 4)
+    optimizar(["d_km", "q", "gamma"], max_iteraciones // 4)
+    optimizar(list(_NOMBRES_ESPACIAL), max_iteraciones)
+    res = getattr(objetivo, "ultimo", None)
+
+    tem = ParametrosETAS(mu=partida["mu"], K=partida["K"], alpha=partida["alpha"],
+                         c=partida["c"], p=partida["p"], m0=m0)
+    esp = ParametrosEspaciales(d_km=partida["d_km"], q=partida["q"],
+                               gamma=partida["gamma"], r_max_km=r_max_km)
+    ll = -objetivo(_empaquetar(partida)[idx_libres], idx_libres)
+
+    fuente = (f"MLE ETAS espacio-temporal sobre n={t.size} eventos, m0={m0:g}, "
+              f"r_max={r_max_km:g} km, ventana={ventana_dias:g} d")
+    unidades = {"mu": "eventos/dia", "K": "adimensional", "alpha": "adimensional",
+                "c": "dias", "p": "adimensional", "d_km": "km", "q": "adimensional",
+                "gamma": "adimensional"}
+    cantidades = {}
+    for nombre in _NOMBRES_ESPACIAL:
+        es_fijo = nombre in fijos
+        cantidades[nombre] = Cantidad(
+            partida[nombre], unidades[nombre],
+            Procedencia.SUPUESTO if es_fijo else Procedencia.DERIVADO,
+            fuente=None if es_fijo else fuente,
+            notas="fijado por quien analiza, no estimado" if es_fijo else "",
+        )
+
+    avisos: list[str] = []
+    if res is not None and not res.success:
+        avisos.append(f"El optimizador no reporto convergencia: {res.message}")
+    n_ram = tem.ramificacion(b_para_ramificacion)
+    if not math.isfinite(n_ram) or n_ram >= 1.0:
+        avisos.append(
+            f"Parametro de ramificacion n = {n_ram:.3f} >= 1: proceso SUPERCRITICO, "
+            "no utilizable para pronostico."
+        )
+    else:
+        avisos.append(f"Parametro de ramificacion n = {n_ram:.3f}.")
+    avisos.append(
+        "El fondo se supuso UNIFORME. Si la sismicidad de fondo real es heterogenea, "
+        "parte de esa estructura se atribuye al disparo y los parametros espaciales "
+        "quedan sesgados hacia radios menores."
+    )
+    avisos.append(
+        f"No se corrigio el efecto de borde: los eventos a menos de {r_max_km:g} km del "
+        "limite de la region pierden parte de su descendencia, lo que sesga K hacia abajo."
+    )
+    if esp.q < 1.1:
+        avisos.append(
+            f"q = {esp.q:.3f} muy proximo a 1: la cola espacial es tan pesada que el "
+            "resultado depende casi por completo de r_max_km."
+        )
+    avisos.append(
+        "d, q y gamma estan fuertemente correlacionados entre si, igual que K y alpha en "
+        "la parte temporal. Un unico optimo puntual no describe bien la incertidumbre: "
+        "conviene explorar el perfil de verosimilitud antes de interpretar cada parametro "
+        "por separado."
+    )
+
+    return AjusteETASEspacial(
+        temporales=tem, espaciales=esp, cantidades=cantidades, log_verosimilitud=ll,
+        n=int(t.size), area_km2=float(area_km2), ventana=(t0, t_fin),
+        t_inicio_ajuste=float(t_inicio_ajuste), n_pares=int(pj.size),
+        convergio=bool(res.success) if res is not None else False,
+        fijos=tuple(sorted(fijos)), advertencias=avisos,
+    )

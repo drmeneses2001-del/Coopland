@@ -25,6 +25,50 @@ comprobarlo.
 | p > 1 | `simular_etas` | Con p ≤ 1 la productividad diverge; el código lo rechaza |
 | Fondo uniforme en la caja | `simular_espacio_temporal` | **No es realista**; sirve para pruebas, no para uso |
 
+### La región del fondo es el supuesto dominante del ajuste espacio-temporal
+
+`ajustar_etas_espacial` supone **fondo uniforme** de densidad `mu / area_km2`.
+Ese supuesto domina el resultado más que cualquier otro, y se midió:
+
+| Ajuste del mismo catálogo | μ estimado (verdadero 0.60) |
+|---|---|
+| Región = caja donde vive el fondo | 0.653 – 0.663 |
+| Región = caja envolvente de todos los eventos | 0.362 – 0.498 |
+
+Tomar como región la envolvente de todos los eventos —incluidas las réplicas
+dispersadas fuera de la zona donde realmente está el fondo— hace que el modelo
+suponga fondo uniforme sobre un área mayor de la real y **subestime μ hasta un
+40 %**. Con la región bien puesta, los ocho parámetros se recuperan bien.
+
+En un catálogo real el fondo no es uniforme en ninguna región, así que este
+sesgo está siempre presente en alguna medida: parte de la estructura del fondo
+se atribuye al disparo y los parámetros espaciales salen sesgados hacia radios
+menores. La solución correcta —estimar el fondo conjuntamente— no está
+implementada (ver `03-pendientes.md`).
+
+Otros dos supuestos del ajuste espacial:
+
+- **Sin efecto de borde**: el término integral supone que el disco de radio
+  `r_max_km` alrededor de cada evento cae entero dentro de la región. Falso
+  cerca del límite, y sesga `K` hacia abajo.
+- **Ventanas de truncamiento** (`ventana_dias`, `r_max_km`) son `SUPUESTO`
+  declarado: si son estrechas se pierde productividad y `K` baja.
+
+### Reportar el radio, no los parámetros sueltos
+
+`d`, `q` y `γ` están fuertemente correlacionados entre sí. En las pruebas de
+recuperación, la escala espacial **derivada** sale mucho mejor determinada que
+los tres parámetros por separado:
+
+| | d | q | γ | radio mediano M6 |
+|---|---|---|---|---|
+| verdadero | 6.0 | 1.70 | 0.60 | 18.4 km |
+| estimado (región mal puesta) | 5.0 | **1.36** | 0.46 | 19.3 km |
+
+`q` se desvía un 20 % mientras el radio mediano acierta dentro del 5 %. Por eso
+`ParametrosEspaciales.radio_mediano_km` existe: es la cantidad que conviene
+reportar e interpretar, no `d`, `q` y `γ` uno a uno.
+
 ### Degeneración conocida de ETAS
 
 En las pruebas de recuperación, `K` y `α` se desvían de forma **correlacionada**

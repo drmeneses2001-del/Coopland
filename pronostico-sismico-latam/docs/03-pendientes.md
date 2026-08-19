@@ -3,6 +3,31 @@
 Lista explícita, exigida por el plan de entrega ("al terminar cada fase, entrega
 … una lista explícita de lo que quedó sin verificar").
 
+## Revisión disciplinar: pendiente
+
+**Ningún sismólogo ha revisado este código.** El proyecto es de uso exclusivo y
+personal hasta que exista esa revisión.
+
+Las pruebas de recuperación de parámetros comprueban que el código implementa
+correctamente las fórmulas. **No comprueban** que las fórmulas sean las
+adecuadas para un problema concreto, ni que las decisiones metodológicas sean
+defendibles. Esa es una clase de error distinta y el software no puede
+detectarla.
+
+Qué convendría que revisara un especialista, por orden de riesgo:
+
+1. **Las decisiones metodológicas por defecto**: corrección de MAXC, umbrales de
+   deduplicación, ventana de estabilidad de b, piso del suavizado. Todas están
+   marcadas como `CONVENCION` o `SUPUESTO`, pero ninguna está calibrada para
+   catálogos latinoamericanos.
+2. **La aplicabilidad de Gardner-Knopoff a subducción mexicana**: sus ventanas
+   se calibraron sobre California en los años 70 y las secuencias interfase
+   tienen extensión espacial mucho mayor.
+3. **La formulación de las pruebas basadas en catálogo**, que se apartan
+   deliberadamente del diseño clásico de CSEP por las razones documentadas en
+   `02-supuestos.md`.
+4. **Los coeficientes de `parametros/`**, contra las publicaciones originales.
+
 ## Sin verificar
 
 ### Fuentes de datos — ninguna
@@ -51,7 +76,7 @@ No implementado, por acuerdo explícito:
 
 | Elemento | Estado |
 |---|---|
-| **ETAS espacio-temporal** | Simulación sí, con fondo heterogéneo opcional y truncamiento espacial obligatorio. **MLE espacial (d, q, γ) no.** El MLE temporal (μ, K, α, c, p) está completo y validado |
+| **ETAS espacio-temporal** | Completo: simulación (con fondo heterogéneo opcional y truncamiento obligatorio) y **MLE de los ocho parámetros** (μ, K, α, c, p, d, q, γ), validado por recuperación. Limitación abierta: el fondo se supone **uniforme**; falta estimarlo conjuntamente por adelgazamiento estocástico o admitirlo como mapa |
 | **Modelos de recurrencia** (BPT, lognormal, Weibull) | No implementados. Ver la advertencia de dominancia del prior en la revisión metodológica: con 2–3 intervalos observados la posterior es esencialmente el prior |
 | **Sismicidad suavizada** | Implementada (núcleo fijo y adaptativo, selección de ancho sin fuga). Es la referencia espacial seria del módulo de evaluación |
 | **Ley de Båth** | Implementada con su diagnóstico de sesgo, no como predictor |

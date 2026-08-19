@@ -15,6 +15,30 @@ Faja Volcánica Transmexicana).
 > Lee [`docs/00-contrato-epistemologico.md`](docs/00-contrato-epistemologico.md)
 > antes de usar cualquier resultado.
 
+## Estado de revisión: uso personal, sin revisar por un especialista
+
+**Ningún sismólogo ha revisado este código todavía.** El autor tiene previsto
+buscar esa revisión; mientras tanto, el proyecto es de **uso exclusivo y
+personal**.
+
+Qué significa en la práctica:
+
+- **No usar con estudiantes ni en docencia** hasta que haya revisión disciplinar.
+- **No publicar ni comunicar resultados** obtenidos con esta herramienta, en
+  ningún formato, ni siquiera con salvedades.
+- **No distribuir** el paquete ni exponerlo como servicio.
+
+La razón no es formalismo. Los estimadores están validados por recuperación de
+parámetros, que comprueba que el **código hace lo que la fórmula dice** — no que
+la fórmula sea la adecuada para un problema concreto, ni que las decisiones
+metodológicas (elección de Mc, de método de decluster, de ventana, de umbral)
+sean defendibles en un contexto real. Eso solo lo puede juzgar alguien con
+formación en la disciplina.
+
+Se suma a que **ninguna fuente de datos, coeficiente de la literatura ni cita
+bibliográfica está verificada** (ver más abajo). El paquete es, por ahora, un
+motor numérico auditable a la espera de que alguien audite la ciencia.
+
 ---
 
 ## Estado actual
@@ -26,11 +50,11 @@ Faja Volcánica Transmexicana).
 | 0 | Procedencia por tipos, esquema de catálogo, reproducibilidad, detección de fuga | ✅ |
 | 1 | Ingesta: registro de fuentes, cliente FDSN, deduplicación, homogenización | ⚠️ ver abajo |
 | 2 | Mc (3 métodos + espacial + temporal), valor b, decluster (3 métodos) | ✅ |
-| 3 | Omori–Utsu, Båth, ETAS temporal (MLE + simulación), ETAS espacio-temporal (simulación), **sismicidad suavizada** | ✅ |
+| 3 | Omori–Utsu, Båth, ETAS temporal y **espacio-temporal** (MLE + simulación), sismicidad suavizada | ✅ |
 | 4 | CSEP (N/L/CL/S/M, poissoniano y basado en catálogo), ganancia de información, Molchan, ROC, Brier | ✅ |
 | 5–8 | PSHA, Coulomb, hipótesis exploratorias, capa de lenguaje | ❌ no implementadas |
 
-**143 pruebas, todas en verde** (138 rápidas + 5 lentas de recuperación y calibración).
+**151 pruebas, todas en verde** (144 rápidas + 7 lentas de recuperación y calibración).
 
 ### ⚠️ Advertencia sobre la Fase 1
 
@@ -184,7 +208,9 @@ obliga a dejar constancia fechada.
 | Recuperación de b (Aki–Utsu) | Insesgado; **cobertura del intervalo 1σ = 68.3 %**, nominal exacto |
 | Sesgo por binning | Sin la corrección `Mc − dM/2`, b sale sesgado a 1.125 (verdadero 1.0) |
 | Recuperación de Omori–Utsu (K, c, p) | Los tres dentro de ~2σ |
-| Recuperación de ETAS (μ, K, α, c, p) | Recupera; degeneración K–α documentada |
+| Recuperación de ETAS temporal (μ, K, α, c, p) | Recupera; degeneración K–α documentada |
+| Recuperación de ETAS espacio-temporal (8 parámetros) | Los ocho, con la región del fondo bien especificada |
+| Sensibilidad a la región del fondo | Ponerla mal subestima μ hasta un 40 % (0.36 frente a 0.65) |
 | Calibración de las 5 pruebas CSEP | Tasa de rechazo ≈ α con el modelo correcto |
 | Potencia del S-test | Detecta error espacial (0.26) donde el N-test correctamente no (0.035) |
 | Empates en Molchan/ROC | Pronóstico constante da AUC = 0.5 y ASS = 0 **exactos** |
