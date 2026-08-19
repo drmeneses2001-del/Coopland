@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Coopland</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2316181b'/%3E%3Cg stroke='%236db6e8' stroke-width='1.4' fill='none'%3E%3Cpath d='M8 22 L16 9 L24 22 M8 22 L24 22 M16 9 L16 22'/%3E%3C/g%3E%3Cg fill='%235fd39b'%3E%3Ccircle cx='16' cy='9' r='3'/%3E%3Ccircle cx='8' cy='22' r='2.6'/%3E%3Ccircle cx='24' cy='22' r='2.6'/%3E%3Ccircle cx='16' cy='22' r='2.2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="grafo/css/estilo.css">
+<style>
+  .envoltorio { max-width: 720px; padding-top: 8px; }
+  a.tarjeta {
+    display: block; text-decoration: none; color: inherit;
+    border: 1px solid var(--linea); background: var(--fondo-alto);
+    border-radius: var(--radio); padding: 16px; margin-top: 10px;
+    min-height: var(--tacto);
+  }
+  a.tarjeta:active { background: var(--fondo-hundido); }
+  a.tarjeta.principal { border-color: var(--activo); }
+  a.tarjeta h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  a.tarjeta.principal h3 { color: var(--activo); }
+  a.tarjeta p { margin: 0; font-size: 13.5px; color: var(--texto-medio); }
+  a.tarjeta .url { font-family: var(--mono); font-size: 11.5px; color: var(--texto-tenue); display: block; margin-top: 6px; }
+</style>
+</head>
+<body>
+<header class="principal">
+  <h1>Coopland</h1>
+  <span class="fase">índice del sitio</span>
+</header>
+<div class="envoltorio">
+
+  <section class="bloque">
+    <h2>Grafo de conocimiento</h2>
+    <p class="nota">
+      Convierte una carpeta de documentos del iPad en un índice de conocimiento
+      navegable. Todo el procesamiento ocurre en el dispositivo: ningún documento
+      sale del navegador. Fases 1 y 2 terminadas; la visualización llega en la 3.
+    </p>
+
+    <a class="tarjeta principal" href="grafo/index.html">
+      <h3>Abrir la aplicación</h3>
+      <p>Elegir carpeta, indexar y ver qué cambió desde la última apertura.</p>
+      <span class="url">grafo/index.html</span>
+    </a>
+
+    <a class="tarjeta" href="grafo/pruebas/index.html">
+      <h3>Ejecutar las pruebas en este dispositivo</h3>
+      <p>
+        Ábrelo <b>primero</b>. Comprueba los parsers, los workers, IndexedDB y el
+        ciclo de indexación incremental aquí, en tu iPad. Dentro está el botón
+        «Verificar ruta B», que resuelve si <code>webkitdirectory</code> funciona
+        de verdad en este dispositivo.
+      </p>
+      <span class="url">grafo/pruebas/index.html</span>
+    </a>
+
+    <a class="tarjeta" href="https://github.com/drmeneses2001-del/Coopland/blob/claude/knowledge-graph-ipad-nodz1m/grafo/README.md">
+      <h3>Notas de arquitectura</h3>
+      <p>
+        Decisiones de diseño, restricciones de iPadOS y estado de cada fase.
+        Se abre en GitHub, que lo muestra con formato — servido desde aquí,
+        Safari lo descargaría como texto suelto.
+      </p>
+      <span class="url">grafo/README.md</span>
+    </a>
+  </section>
+
+  <section class="bloque">
+    <h2>Otros archivos del repositorio</h2>
+    <a class="tarjeta" href="Calculadora%20Coopland.html">
+      <h3>Calculadora Coopland</h3>
+      <p>La página que ya vivía en este repositorio, sin cambios.</p>
+      <span class="url">Calculadora Coopland.html</span>
+    </a>
+  </section>
+
+</div>
+</body>
+</html>
