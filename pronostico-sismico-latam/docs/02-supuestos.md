@@ -33,6 +33,26 @@ del optimizador: la verosimilitud es plana a lo largo de esa dirección. Las σ 
 salen del hessiano son **optimistas** en esa combinación. Si se necesita `α` bien
 determinada, conviene fijarla o usar un prior informativo.
 
+## Sismicidad suavizada
+
+| Supuesto | Dónde | Efecto si es falso |
+|---|---|---|
+| **La sismicidad futura ocurre donde la pasada** | `pronostico_suavizado` | Es la hipótesis que el modelo encarna. **Falsa justo donde más importa**: un sismo grande en una brecha sísmica ocurre, por definición, donde no ha habido sismicidad reciente |
+| Estacionariedad de la tasa | escalado de `dias_entrenamiento` a `dias_pronostico` | El total pronosticado se desvía; comprobable a posteriori con el N-test |
+| Piso uniforme del 1 % | `PISO_RELATIVO_POR_DEFECTO` | `SUPUESTO`. Sin él, una celda sin sismicidad histórica da log-verosimilitud −∞ ante un solo evento. Subirlo acerca el modelo al uniforme y reduce a la vez su ganancia potencial y su riesgo de catástrofe |
+| Catálogo declusterizado | uso previsto | Suavizar el catálogo completo mete las réplicas pasadas en el mapa de fondo y concentra el pronóstico donde hubo secuencias — que es donde menos probable es que se repitan a medio plazo |
+
+### El ancho del núcleo no es un parámetro libre
+
+Elegirlo mirando el periodo de prueba es fuga de información y es una de las
+formas más comunes de inflar el desempeño aparente. `optimizar_ancho` parte el
+entrenamiento internamente por un corte temporal y **no recibe el periodo de
+prueba**: la salvaguarda es estructural, no una comprobación posterior.
+
+Cuando el óptimo cae en un extremo del rango probado, o cuando la verosimilitud
+apenas varía entre candidatos, la función lo advierte: en ese caso el ancho está
+mal determinado y reportar el óptimo como si estuviera restringido es engañoso.
+
 ## Evaluación
 
 | Supuesto | Dónde | Efecto si es falso |
@@ -40,7 +60,24 @@ determinada, conviene fijarla o usar un prior informativo.
 | Poisson por celda | `n_test`, `l_test`, `brier` | **Rechazos espurios** con modelos autoexcitados. Bloqueado por `poisson_valido=False` |
 | Definición fija del evento objetivo | `EventoObjetivo` | Brier y Molchan cambian de valor; debe fijarse antes de mirar datos |
 | Medida de referencia declarada | `molchan` | El eje τ deja de ser interpretable. **Exigida en la firma** |
-| Suavizado en `l_test_catalogo` | `suavizado=0.1` | `SUPUESTO`; repetir con otro valor |
+| Suavizado en las pruebas basadas en catálogo | `suavizado=0.1` | `SUPUESTO`; repetir con otro valor |
+| Estadístico independiente de *N* | `s_test_catalogo`, `m_test_catalogo` | Necesario: con ETAS, la mayoría de las simulaciones tiene menos eventos que el observado |
+
+### Por qué las pruebas marginales basadas en catálogo no remuestrean a *N* fijo
+
+El diseño obvio —extraer *N* observado eventos de cada catálogo simulado— falla
+de dos maneras, y ambas se comprobaron empíricamente:
+
+- **Sin reemplazo**: con ETAS, casi todas las simulaciones tienen menos eventos
+  que el observado (en una prueba, 391 de 400) y hay que descartarlas, lo que
+  sesga la referencia hacia las realizaciones más productivas del modelo.
+- **Con reemplazo**: aparecen localizaciones repetidas que agrupan
+  artificialmente los catálogos de referencia, hunden su verosimilitud y dejan
+  al observado siempre por encima. El cuantil sale 1.0000 y **la prueba pierde
+  toda su potencia**.
+
+El estadístico usado es la log-verosimilitud media **por evento**, que es
+independiente de *N* y aprovecha todas las simulaciones.
 
 ### Empates en Molchan y ROC
 

@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from typing import Callable
 
 import numpy as np
 from scipy import optimize
@@ -58,8 +59,37 @@ from .omori import integral_omori
 
 __all__ = [
     "ParametrosETAS", "AjusteETAS", "intensidad_etas",
-    "ajustar_etas", "simular_etas", "simular_espacio_temporal",
+    "ajustar_etas", "simular_etas", "simular_espacio_temporal", "fondo_de_mezcla",
 ]
+
+
+def fondo_de_mezcla(
+    focos: "list[tuple[float, float, float, float]]",
+) -> "Callable[[int, np.random.Generator], tuple[np.ndarray, np.ndarray]]":
+    """Construye un muestreador de fondo como mezcla de focos gaussianos.
+
+    Cada foco es ``(lon, lat, sigma_grados, peso)``. Sirve para simular una
+    sismicidad de fondo heterogenea con la que comprobar que un modelo espacial
+    encuentra la estructura que realmente existe.
+
+    No pretende representar la tectonica de ninguna region: es un generador de
+    prueba con estructura conocida, y asi debe citarse en cualquier resultado.
+    """
+    if not focos:
+        raise ValueError("se requiere al menos un foco")
+    lons = np.array([f[0] for f in focos], dtype=float)
+    lats = np.array([f[1] for f in focos], dtype=float)
+    sig = np.array([f[2] for f in focos], dtype=float)
+    pesos = np.array([f[3] for f in focos], dtype=float)
+    if np.any(sig <= 0) or np.any(pesos <= 0):
+        raise ValueError("sigma y peso de cada foco deben ser positivos")
+    pesos = pesos / pesos.sum()
+
+    def muestrear(n: int, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
+        k = rng.choice(len(pesos), size=n, p=pesos)
+        return (rng.normal(lons[k], sig[k]), rng.normal(lats[k], sig[k]))
+
+    return muestrear
 
 
 @dataclass(frozen=True)
@@ -400,6 +430,7 @@ def simular_espacio_temporal(
     r_max_km: float = 200.0,
     dm: float = 0.1,
     m_max: float | None = None,
+    muestrear_fondo: "Callable[[int, np.random.Generator], tuple[np.ndarray, np.ndarray]] | None" = None,
     rng: np.random.Generator | None = None,
 ) -> "pd.DataFrame":
     """Simula ETAS espacio-temporal. El nucleo espacial es de tipo potencia isotropo.
@@ -425,9 +456,20 @@ def simular_espacio_temporal(
     porque las pruebas CSEP basadas en catalogo (fase 4) la necesitan para
     construir la distribucion de referencia del modelo.
 
-    El fondo es uniforme en la caja, lo cual **no es realista**: la sismicidad
-    de fondo real es fuertemente heterogenea. Para uso mas alla de las pruebas,
-    sustituir por un fondo suavizado a partir del catalogo.
+    Fondo espacial
+    --------------
+    Por defecto el fondo es **uniforme en la caja**, lo cual no es realista: la
+    sismicidad de fondo real es fuertemente heterogenea (concentrada en la zona
+    sismogenica interfase, en la losa intermedia, en fallas corticales
+    concretas). El parametro ``muestrear_fondo`` permite pasar cualquier
+    distribucion espacial; :func:`fondo_de_mezcla` construye una a partir de
+    focos gaussianos.
+
+    La eleccion importa para evaluar: con fondo uniforme **no existe estructura
+    espacial persistente que aprender**, asi que cualquier modelo espacial debe
+    dar ganancia nula. Con fondo heterogeneo, un buen modelo debe encontrarla.
+    Ambos casos son necesarios para comprobar que el modulo de evaluacion ni
+    inventa destreza ni la pasa por alto.
     """
     import pandas as pd
     from ..sintetico import magnitudes_gr, tiempos_omori
@@ -446,8 +488,17 @@ def simular_espacio_temporal(
     n_fondo = int(rng.poisson(par.mu * t_fin))
     t_act = np.sort(rng.random(n_fondo) * t_fin)
     m_act = magnitudes_gr(n_fondo, b, par.m0, dm, m_max=m_max, rng=rng)
-    x_act = rng.uniform(lon0, lon1, n_fondo)
-    y_act = rng.uniform(lat0, lat1, n_fondo)
+    if muestrear_fondo is None:
+        x_act = rng.uniform(lon0, lon1, n_fondo)
+        y_act = rng.uniform(lat0, lat1, n_fondo)
+    else:
+        x_act, y_act = muestrear_fondo(n_fondo, rng)
+        x_act = np.asarray(x_act, dtype=float)
+        y_act = np.asarray(y_act, dtype=float)
+        if x_act.size != n_fondo or y_act.size != n_fondo:
+            raise ValueError(
+                f"muestrear_fondo devolvio {x_act.size} posiciones, se pidieron {n_fondo}"
+            )
     gen_act = np.zeros(n_fondo, dtype=int)
     acum = [(t_act, m_act, x_act, y_act, gen_act)]
 

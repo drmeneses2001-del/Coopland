@@ -51,9 +51,9 @@ No implementado, por acuerdo explícito:
 
 | Elemento | Estado |
 |---|---|
-| **ETAS espacio-temporal** | Simulación sí (`simular_espacio_temporal`). **MLE espacial (d, q, γ) no.** El MLE temporal (μ, K, α, c, p) está completo y validado |
+| **ETAS espacio-temporal** | Simulación sí, con fondo heterogéneo opcional y truncamiento espacial obligatorio. **MLE espacial (d, q, γ) no.** El MLE temporal (μ, K, α, c, p) está completo y validado |
 | **Modelos de recurrencia** (BPT, lognormal, Weibull) | No implementados. Ver la advertencia de dominancia del prior en la revisión metodológica: con 2–3 intervalos observados la posterior es esencialmente el prior |
-| **Sismicidad suavizada** como línea base espacial | No implementada. La línea base actual es Poisson homogéneo |
+| **Sismicidad suavizada** | Implementada (núcleo fijo y adaptativo, selección de ancho sin fuga). Es la referencia espacial seria del módulo de evaluación |
 | **Ley de Båth** | Implementada con su diagnóstico de sesgo, no como predictor |
 | **Frontend** | No existe. El paquete es una biblioteca de Python |
 | **Almacenamiento PostgreSQL/PostGIS** | No. Se usa Parquet para instantáneas |
@@ -63,7 +63,10 @@ No implementado, por acuerdo explícito:
 1. **Coste computacional del MLE de ETAS**: la verosimilitud es O(n²) sin
    truncar. Con ~2 500 eventos tarda ~15 s por ajuste. Para catálogos de 10⁵
    eventos hará falta truncar la influencia temporal o vectorizar.
-2. **`mc_espacial` es O(celdas × eventos)**: aceptable para diagnóstico, lento
+2. **`campo_suavizado` es O(celdas × eventos)** por trozos. Suficiente para
+   rejillas de diagnóstico; para rejillas finas sobre catálogos grandes
+   convendría convolución por FFT.
+3. **`mc_espacial` es O(celdas × eventos)**: aceptable para diagnóstico, lento
    para rejillas finas sobre catálogos grandes.
-3. **Licencia del repositorio sin decidir.** Ver
+4. **Licencia del repositorio sin decidir.** Ver
    [`adr/0002-openquake-y-agpl.md`](adr/0002-openquake-y-agpl.md).

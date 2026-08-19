@@ -37,7 +37,8 @@ from .pronostico import ErrorDeSupuesto, PronosticoCatalogo, PronosticoRejilla, 
 
 __all__ = [
     "ResultadoPrueba", "n_test", "l_test", "cl_test", "s_test", "m_test",
-    "n_test_catalogo", "l_test_catalogo", "ganancia_informacion", "log_verosimilitud_poisson",
+    "n_test_catalogo", "l_test_catalogo", "s_test_catalogo", "m_test_catalogo",
+    "ganancia_informacion", "log_verosimilitud_poisson",
 ]
 
 
@@ -359,3 +360,108 @@ def ganancia_informacion(
         "log_verosimilitud_referencia": float(ll_r),
         "n_observado": n_obs,
     }
+
+
+def _prueba_marginal_catalogo(
+    pron: PronosticoCatalogo, observado: pd.DataFrame, ejes: tuple[int, ...],
+    nombre: str, alfa: float, semilla: int, columna_mag: str, suavizado: float,
+) -> ResultadoPrueba:
+    """Prueba marginal con distribucion de referencia tomada de los catalogos simulados.
+
+    El estadistico es la **log-verosimilitud espacial (o de magnitud) media por
+    evento**:
+
+    .. math::
+        T = \\frac{1}{N} \\sum_{k=1}^{N} \\log p(\\text{celda del evento } k)
+
+    donde ``p`` es el campo de probabilidad normalizado del modelo. Al ser una
+    media por evento, es **independiente del numero de eventos**, de modo que los
+    catalogos simulados se pueden comparar con el observado aunque sus totales
+    difieran mucho -- que es justo lo que pasa con un modelo autoexcitado, cuyos
+    conteos son muy dispersos.
+
+    Por que no se remuestrea a N fijo
+    ---------------------------------
+    Un diseno alternativo seria extraer ``N_obs`` eventos de cada catalogo
+    simulado. No funciona aqui: con ETAS, la mayoria de las simulaciones tiene
+    menos eventos que el observado y habria que descartarlas, lo que sesga la
+    referencia hacia las realizaciones mas productivas. Y hacerlo **con**
+    reemplazo introduce localizaciones repetidas que agrupan artificialmente la
+    referencia, hunden su verosimilitud y dejan al observado siempre por encima:
+    la prueba pierde toda su potencia.
+    """
+    rej = pron.rejilla
+    media = pron.tasa_media().tasas.sum(axis=ejes)
+    if media.sum() <= 0:
+        raise ValueError(f"{nombre}: la tasa media simulada es nula")
+    piso = suavizado * media[media > 0].mean() if np.any(media > 0) else 0.0
+    prob = media + piso
+    prob = prob / prob.sum()
+    log_prob = np.log(prob)
+
+    def estadistico(cat: pd.DataFrame) -> float:
+        i, j, k, dentro = rej.indexar(cat["lon"], cat["lat"], cat[columna_mag])
+        if not dentro.any():
+            return float("nan")
+        c = np.zeros(rej.forma)
+        np.add.at(c, (i[dentro], j[dentro], k[dentro]), 1.0)
+        cm = c.sum(axis=ejes)
+        n = cm.sum()
+        return float(np.sum(cm * log_prob) / n)
+
+    t_obs = estadistico(observado)
+    if not math.isfinite(t_obs):
+        raise ValueError(f"{nombre}: ningun evento observado cae dentro de la rejilla")
+
+    t_sim = np.array([estadistico(c) for c in pron.catalogos], dtype=float)
+    validos = np.isfinite(t_sim)
+    if int(validos.sum()) < 50:
+        raise ValueError(
+            f"{nombre}: solo {int(validos.sum())} catalogos simulados tienen eventos dentro "
+            "de la rejilla. La distribucion de referencia no tiene resolucion util."
+        )
+    t_sim = t_sim[validos]
+
+    gamma = float(np.mean(t_sim <= t_obs))
+    avisos = [
+        f"Piso de suavizado {suavizado:g} aplicado para evitar celdas de probabilidad cero; "
+        "es un SUPUESTO, comprueba que la conclusion no cambia con otro valor.",
+    ]
+    n_descartados = int((~validos).sum())
+    if n_descartados:
+        avisos.append(
+            f"{n_descartados} de {pron.n_simulaciones} catalogos simulados no tenian ningun "
+            "evento dentro de la rejilla y se excluyeron de la referencia."
+        )
+    resolucion = 1.0 / t_sim.size
+    if min(gamma, 1 - gamma) < 5 * resolucion:
+        avisos.append(
+            f"El cuantil ({gamma:.4g}) esta cerca de la resolucion de {t_sim.size} "
+            f"simulaciones ({resolucion:.4g}). Aumenta las simulaciones antes de reportar."
+        )
+    return ResultadoPrueba(
+        nombre=nombre, estadistico_observado=t_obs, cuantil=gamma, p_valor=gamma,
+        rechaza=bool(gamma < alfa), alfa=alfa,
+        metodo="basado en catalogo (log-verosimilitud media por evento)",
+        distribucion_referencia=t_sim, advertencias=tuple(avisos),
+    )
+
+
+def s_test_catalogo(
+    pron: PronosticoCatalogo, observado: pd.DataFrame, *, alfa: float = 0.05,
+    semilla: int = 0, columna_mag: str = "mag", suavizado: float = 0.1,
+) -> ResultadoPrueba:
+    """S-test basado en catalogo: valido para modelos que producen agrupamiento."""
+    return _prueba_marginal_catalogo(
+        pron, observado, (2,), "S-test", alfa, semilla, columna_mag, suavizado
+    )
+
+
+def m_test_catalogo(
+    pron: PronosticoCatalogo, observado: pd.DataFrame, *, alfa: float = 0.05,
+    semilla: int = 0, columna_mag: str = "mag", suavizado: float = 0.1,
+) -> ResultadoPrueba:
+    """M-test basado en catalogo."""
+    return _prueba_marginal_catalogo(
+        pron, observado, (0, 1), "M-test", alfa, semilla, columna_mag, suavizado
+    )

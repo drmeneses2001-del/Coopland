@@ -182,3 +182,123 @@ def test_evento_objetivo_se_arrastra_al_resultado(campo):
     ev = EventoObjetivo(4.0, 365.0, 1.0, "region de prueba")
     assert molchan(verdad, obs, areas_celda=REJILLA.areas_km2, evento=ev).evento is ev
     assert brier(verdad, obs, evento=ev).evento is ev
+
+
+# --- pruebas marginales basadas en catalogo ------------------------------
+def _cats(fondo, n, semilla, t_fin=1800.0):
+    """Catalogos ETAS espacio-temporales con un fondo dado."""
+    from sismolat.modelos.etas import ParametrosETAS, simular_espacio_temporal
+    par = ParametrosETAS(mu=0.55, K=0.018, alpha=1.5, c=0.01, p=1.18, m0=3.0)
+    rng = np.random.default_rng(semilla)
+    return [
+        simular_espacio_temporal(par, b=1.0, t_fin=t_fin, caja=CAJA_ETAS,
+                                 muestrear_fondo=fondo, rng=rng)[["lon", "lat", "mag"]]
+        for _ in range(n)
+    ]
+
+
+CAJA_ETAS = (-102.0, -96.0, 15.0, 19.5)
+REJILLA_ETAS = Rejilla.regular(CAJA_ETAS, 0.5, 3.0, 7.5, 0.5)
+
+
+@pytest.fixture(scope="module")
+def fondos():
+    from sismolat.modelos.etas import fondo_de_mezcla
+    correcto = fondo_de_mezcla([(-99.5, 16.5, 0.35, 3.0), (-97.0, 16.0, 0.30, 2.0),
+                                (-100.5, 18.5, 0.45, 1.0)])
+    distinto = fondo_de_mezcla([(-98.0, 18.5, 0.40, 1.0)])
+    return correcto, distinto
+
+
+@pytest.fixture(scope="module")
+def pron_catalogo(fondos):
+    from sismolat.evaluacion.pronostico import PronosticoCatalogo
+    correcto, _ = fondos
+    return PronosticoCatalogo(_cats(correcto, 300, 3), REJILLA_ETAS, "ETAS correcto", 1800.0)
+
+
+@pytest.mark.lento
+def test_s_test_catalogo_calibrado_y_con_potencia(pron_catalogo, fondos):
+    """Calibrado con el modelo correcto; detecta un fondo espacial equivocado."""
+    from sismolat.evaluacion.csep import s_test_catalogo
+    correcto, distinto = fondos
+    n = 40
+    ok = sum(s_test_catalogo(pron_catalogo, _cats(correcto, 1, 100 + k)[0],
+                             semilla=k).rechaza for k in range(n))
+    mal = sum(s_test_catalogo(pron_catalogo, _cats(distinto, 1, 200 + k)[0],
+                              semilla=k).rechaza for k in range(n))
+    assert ok / n < 0.20, f"rechaza {ok / n:.3f} con el modelo correcto"
+    assert mal / n > 0.60, f"solo detecta {mal / n:.3f} de los fondos equivocados"
+
+
+@pytest.mark.lento
+def test_m_test_catalogo_no_reacciona_a_un_error_espacial(pron_catalogo, fondos):
+    """La distribucion de magnitudes no cambio: el M-test no debe rechazar."""
+    from sismolat.evaluacion.csep import m_test_catalogo
+    _, distinto = fondos
+    n = 40
+    mal = sum(m_test_catalogo(pron_catalogo, _cats(distinto, 1, 300 + k)[0],
+                              semilla=k).rechaza for k in range(n))
+    assert mal / n < 0.20, f"el M-test reacciona ({mal / n:.3f}) a un error puramente espacial"
+
+
+@pytest.mark.lento
+def test_la_evaluacion_detecta_destreza_real_y_solo_cuando_existe(fondos):
+    """El contraste que valida el modulo entero.
+
+    Con fondo uniforme no hay estructura espacial persistente que aprender: la
+    respuesta correcta es ganancia nula o negativa. Con fondo heterogeneo la hay,
+    y debe encontrarse. Un modulo que solo cumpliera una de las dos mitades seria
+    inutil: el primero detecta invencion de destreza, el segundo, ceguera.
+    """
+    import pandas as pd
+
+    from sismolat.evaluacion.alarma import molchan, roc
+    from sismolat.evaluacion.csep import ganancia_informacion
+    from sismolat.modelos.etas import ParametrosETAS, simular_espacio_temporal
+    from sismolat.modelos.suavizado import pronostico_suavizado
+
+    correcto, _ = fondos
+    par = ParametrosETAS(mu=0.55, K=0.018, alpha=1.5, c=0.01, p=1.18, m0=3.0)
+    resultados = {}
+    for etiqueta, fondo in (("uniforme", None), ("heterogeneo", correcto)):
+        df = simular_espacio_temporal(par, b=1.0, t_fin=4000.0, caja=CAJA_ETAS,
+                                      muestrear_fondo=fondo,
+                                      rng=np.random.default_rng(7))
+        t0 = pd.Timestamp("2012-01-01")
+        d = pd.DataFrame({"tiempo": t0 + pd.to_timedelta(df["t_dias"], unit="D"),
+                          "lon": df["lon"], "lat": df["lat"], "mag": df["mag"]})
+        d = d[d["lon"].between(*CAJA_ETAS[:2]) & d["lat"].between(*CAJA_ETAS[2:])]
+        corte = pd.Timestamp("2018-01-01")
+        tr, te = d[d["tiempo"] <= corte], d[d["tiempo"] > corte]
+        dtr = (corte - d["tiempo"].min()) / pd.Timedelta(days=1)
+        dte = (d["tiempo"].max() - corte) / pd.Timedelta(days=1)
+
+        suave = pronostico_suavizado(tr, REJILLA_ETAS, b=1.0, dias_entrenamiento=dtr,
+                                     dias_pronostico=dte, k_vecinos=10)
+        centros = 0.5 * (REJILLA_ETAS.mag_bordes[:-1] + REJILLA_ETAS.mag_bordes[1:])
+        pm = np.exp(-np.log(10) * (centros - REJILLA_ETAS.mag_bordes[0]))
+        pm = pm * np.diff(REJILLA_ETAS.mag_bordes)
+        pm /= pm.sum()
+        base = PronosticoRejilla(
+            REJILLA_ETAS,
+            np.ones(REJILLA_ETAS.forma)
+            * (len(tr) * dte / dtr / REJILLA_ETAS.n_celdas_espaciales) * pm[None, None, :],
+            "Poisson uniforme + G-R", dte,
+        )
+        umbral = 4.5
+        bins = REJILLA_ETAS.mag_bordes[:-1] >= umbral - 1e-9
+        obs = REJILLA_ETAS.contar(te[te["mag"] >= umbral]).sum(axis=2)
+        campo = suave.tasas[:, :, bins].sum(axis=2)
+        resultados[etiqueta] = {
+            "ganancia": ganancia_informacion(suave, base, te)["ganancia_por_evento"],
+            "ass": molchan(campo, obs, areas_celda=REJILLA_ETAS.areas_km2).ganancia_area,
+            "auc": roc(campo, obs).area_bajo_curva,
+        }
+
+    u, h = resultados["uniforme"], resultados["heterogeneo"]
+    assert u["ganancia"] < 0.15, f"inventa destreza con fondo uniforme: {u}"
+    assert u["auc"] < 0.65, f"inventa destreza con fondo uniforme: {u}"
+    assert h["ganancia"] > 0.5, f"no detecta la destreza que existe: {h}"
+    assert h["auc"] > 0.75, f"no detecta la destreza que existe: {h}"
+    assert h["ass"] > 0.4, f"no detecta la destreza que existe: {h}"

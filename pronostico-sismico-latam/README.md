@@ -26,11 +26,11 @@ Faja Volcánica Transmexicana).
 | 0 | Procedencia por tipos, esquema de catálogo, reproducibilidad, detección de fuga | ✅ |
 | 1 | Ingesta: registro de fuentes, cliente FDSN, deduplicación, homogenización | ⚠️ ver abajo |
 | 2 | Mc (3 métodos + espacial + temporal), valor b, decluster (3 métodos) | ✅ |
-| 3 | Omori–Utsu, Båth, ETAS temporal (MLE + simulación), ETAS espacio-temporal (simulación) | ✅ |
+| 3 | Omori–Utsu, Båth, ETAS temporal (MLE + simulación), ETAS espacio-temporal (simulación), **sismicidad suavizada** | ✅ |
 | 4 | CSEP (N/L/CL/S/M, poissoniano y basado en catálogo), ganancia de información, Molchan, ROC, Brier | ✅ |
 | 5–8 | PSHA, Coulomb, hipótesis exploratorias, capa de lenguaje | ❌ no implementadas |
 
-**123 pruebas, todas en verde** (121 rápidas + 2 lentas de recuperación de ETAS).
+**143 pruebas, todas en verde** (138 rápidas + 5 lentas de recuperación y calibración).
 
 ### ⚠️ Advertencia sobre la Fase 1
 
@@ -123,35 +123,52 @@ eventos eliminados sobre el mismo catálogo.
 
 ### 4. Las pruebas poissonianas se niegan a correr sobre modelos autoexcitados
 
-Este es el resultado más importante del módulo de evaluación. Sobre un catálogo
-generado por ETAS:
+Sobre un catálogo generado por ETAS, con un pronóstico de sismicidad suavizada:
 
-```
-N-test [Poisson]:              p = 8.8e-08  -> RECHAZA
-N-test [basado en catálogo]:   p = 0.45     -> no rechaza
-var(N)/media(N) = 28.4   (bajo Poisson valdría 1.0)
-```
+| Prueba | Poissoniana | Basada en catálogo |
+|---|---|---|
+| N-test | p = 1.0e-35 → **rechaza** | p = 0.14 → no rechaza |
+| S-test | p = 0 → **rechaza** | p = 0.77 → no rechaza |
+| M-test | p = 0.17 → no rechaza | p = 0.13 → no rechaza |
 
-El rechazo poissoniano es **espurio**: castiga al modelo por una sobredispersión
-que el modelo predice correctamente. `PronosticoRejilla` lleva la bandera
-`poisson_valido`, y las pruebas lanzan `ErrorDeSupuesto` cuando no corresponde.
+`var(N)/media(N) = 36.5` en las simulaciones del modelo (bajo Poisson valdría 1).
 
-### 5. El módulo de evaluación no inventa destreza
+Los rechazos poissonianos son **espurios**: castigan al modelo por una
+sobredispersión y un agrupamiento que el modelo predice correctamente. Nótese
+que el M-test *no* rechaza en ninguna versión — el agrupamiento afecta al conteo
+y al espacio, no a la distribución de magnitudes. `PronosticoRejilla` lleva la
+bandera `poisson_valido`, y las pruebas lanzan `ErrorDeSupuesto` cuando no
+corresponde.
 
-En el ejemplo, el fondo de la simulación es espacialmente uniforme: no hay
-estructura que aprender. El resultado correcto es *ninguna ganancia*, y eso es
-lo que sale:
+### 5. Detecta destreza cuando existe, y no la inventa cuando no
 
-```
-Ganancia sobre Poisson (uniforme en espacio, G-R en magnitud): -0.385 nats/evento
-Molchan ASS = -0.111    ROC AUC = 0.492    destreza de Brier = -0.576
-```
+El mismo análisis sobre dos catálogos que solo difieren en el fondo espacial de
+la simulación:
+
+| Escenario | Ganancia | Molchan ASS | ROC AUC | Destreza Brier |
+|---|---|---|---|---|
+| Fondo **heterogéneo** (hay estructura) | **+1.172** | **+0.754** | **0.911** | **+0.437** |
+| Fondo **uniforme** (no hay nada que aprender) | −0.081 | −0.118 | 0.462 | −0.054 |
+
+Un módulo que solo acertara en una de las dos mitades sería inútil: la primera
+detecta ceguera, la segunda detecta invención de destreza.
 
 La línea base usa la distribución G–R de magnitudes a propósito: una referencia
 uniforme también en magnitud sería un hombre de paja e inflaría la ganancia
 aparente.
 
-### 6. Se declara lo que el software no puede garantizar
+### 6. La referencia no es un rival trivial
+
+El modelo de comparación es **sismicidad suavizada** con núcleo adaptativo (el
+ancho de cada evento es la distancia a su k-ésimo vecino), no un Poisson
+uniforme. Es el rival exigente que se usa en la práctica: buena parte de los
+modelos publicados apenas lo superan.
+
+El ancho del núcleo se elige por verosimilitud **dentro del entrenamiento**;
+`optimizar_ancho` no recibe el periodo de prueba, así que la salvaguarda contra
+la fuga es estructural, no una comprobación posterior.
+
+### 7. Se declara lo que el software no puede garantizar
 
 `verificar_corte_temporal` detecta fuga **por marcas de tiempo** y lo dice: la
 fuga por selección de modelo tras haber visto el catálogo completo es indecidible
@@ -172,6 +189,10 @@ obliga a dejar constancia fechada.
 | Potencia del S-test | Detecta error espacial (0.26) donde el N-test correctamente no (0.035) |
 | Empates en Molchan/ROC | Pronóstico constante da AUC = 0.5 y ASS = 0 **exactos** |
 | Brier de la climatología | Destreza y resolución exactamente 0 |
+| Calibración de S/M-test basados en catálogo | 0.033 y 0.050 con el modelo correcto |
+| Potencia del S-test basado en catálogo | **1.000** frente a un fondo espacial equivocado |
+| Especificidad del M-test | 0.050 ante ese mismo error espacial: no reacciona a lo que no le toca |
+| Conservación de masa del suavizado | Exacta, también con núcleos que tocan el borde |
 
 ---
 
@@ -185,7 +206,7 @@ src/sismolat/
   sintetico.py          Generadores con parámetros conocidos (para las pruebas)
   ingesta/              fuentes · fdsn · dedup · homogenizacion · instantanea
   estadistica/          gutenberg_richter · mc · decluster
-  modelos/              omori · etas
+  modelos/              omori · etas · suavizado
   evaluacion/           pronostico · csep · alarma
 parametros/             Coeficientes externalizados, todos marcados verificado = false
 docs/                   Contrato, fuentes, supuestos, pendientes, ADR
