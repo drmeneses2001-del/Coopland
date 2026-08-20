@@ -101,6 +101,25 @@ y [`docs/03-pendientes.md`](docs/03-pendientes.md).
 
 ---
 
+## Ver la salida sin ejecutar nada
+
+[`ejemplos/informe-ejemplo.html`](ejemplos/informe-ejemplo.html) es un informe ya
+generado: ábrelo con doble clic. No necesita servidor, conexión ni instalar nada.
+
+Trae la curva de peligro con su banda de incertidumbre, el mapa de fondo sísmico
+estimado, la desagregación magnitud–distancia, el panel de resultado nulo y la
+revisión metodológica — cada cifra con su sello de procedencia.
+
+Es una **muestra generada**: los datos son sintéticos con parámetros conocidos y
+las fuentes son de ejemplo, así que ningún número describe una región real. Para
+regenerarlo con otros parámetros:
+
+```bash
+python ejemplos/informe_completo.py mi_informe.html
+```
+
+---
+
 ## Instalación
 
 ```bash
