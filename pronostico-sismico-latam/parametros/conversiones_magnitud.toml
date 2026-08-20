@@ -1,0 +1,38 @@
+# Relaciones de conversion entre escalas de magnitud.
+#
+# NO HAY NINGUNA CONVERSION ACTIVA POR DEFECTO.
+#
+# Una conversion entre escalas es una REGRESION EMPIRICA CON ERROR, valida solo
+# en el rango de magnitudes sobre el que se ajusto y, en general, solo en la
+# region donde se calibro. Copiar coeficientes de memoria produce numeros que
+# parecen datos y no lo son.
+#
+# Cada bloque describe: Mw_estimada = a + b * M_origen, con desviacion residual
+# `sigma`, valida en [rango_min, rango_max].
+#
+# COMO ANADIR UNA CONVERSION VERIFICADA:
+#   1. Localiza una regresion publicada calibrada para la region que analizas
+#      (para Mexico, preferentemente ajustada sobre el catalogo del SSN contra
+#      Mw del GCMT).
+#   2. Copia a, b, sigma y el rango de validez del articulo.
+#   3. Anade el bloque con verificado = true, la cita completa y el DOI.
+#
+# El codigo se niega a convertir con un bloque no verificado salvo autorizacion
+# explicita, y en ese caso marca toda magnitud convertida como NO VERIFICADA.
+
+# Ejemplo de la estructura esperada (DESACTIVADO: coeficientes ficticios).
+# No lo actives: los numeros son marcadores de posicion, no una regresion real.
+[ejemplo_estructura]
+activo = false
+verificado = false
+escala_origen = "mb"
+escala_destino = "Mw"
+a = 0.0
+b = 1.0
+sigma = 0.0
+rango_min = 0.0
+rango_max = 0.0
+fuente = "PLANTILLA -- no es una regresion real, es la forma del bloque"
+doi = ""
+region_calibracion = ""
+notas = "Sustituir por una regresion publicada y verificada antes de activar."

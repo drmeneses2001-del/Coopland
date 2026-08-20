@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sismolat"
+version = "0.1.0"
+description = "Pronostico sismico probabilistico y evaluacion de peligro para America Latina (docente e investigativo)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "pyarrow>=12.0",
+]
+
+[project.optional-dependencies]
+# pyCSEP es BSD-3-Clause: sin problema de licencia.
+csep = ["pycsep>=0.6"]
+# ATENCION: OpenQuake es AGPL-3.0. Si el servicio se expone por red, la AGPL
+# alcanza a todo el servicio. Ver docs/adr/0002-openquake-y-agpl.md antes de
+# instalar este extra. No se necesita para las fases 0-4.
+#
+# NOTA DE INSTALACION: openquake-engine arrastra GDAL, que necesita bibliotecas
+# del sistema (gdal-config) y falla en entornos sin ellas. hazardlib --que es lo
+# unico que usa este paquete-- no las necesita:
+#   pip install --no-deps openquake-engine
+#   pip install h5py shapely numba decorator psutil pyzmq h3 alpha_shapes fiona
+psha = ["openquake-engine>=3.19"]
+# Capa de lenguaje natural. Es OPCIONAL: todo el motor numerico funciona sin ella.
+lenguaje = ["anthropic>=0.40"]
+dev = ["pytest>=8.0", "pytest-cov"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["lento: pruebas que tardan minutos (recuperacion de parametros de ETAS)"]

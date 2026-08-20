@@ -1,0 +1,84 @@
+# Registro de fuentes de datos.
+#
+# NINGUNA URL BASE ESTA RELLENA A PROPOSITO.
+#
+# El entorno donde se construyo este codigo tenia el egreso de red bloqueado
+# hacia todos los servicios sismologicos (ver docs/01-fuentes-verificadas.md),
+# de modo que no fue posible comprobar una sola ruta de API. Escribir aqui una
+# URL "de memoria" seria exactamente lo que prohibe la regla 3 del contrato
+# epistemologico: parece un dato y no lo es.
+#
+# COMO ACTIVAR UNA FUENTE:
+#   1. Abre la pagina oficial del servicio (campo `documentacion`).
+#   2. Localiza la URL base real del servicio de eventos.
+#   3. Rellena `url_base` y pon `verificado = true` con la fecha en
+#      `verificado_el` y tus iniciales en `verificado_por`.
+#   4. Lee y anota los terminos de uso en `licencia`. Si el servicio prohibe
+#      la redistribucion, pon `puede_cachearse = false`: la capa de ingesta
+#      respetara esa marca y no persistira el resultado.
+#
+# El cliente lanza un error claro si intentas usar una fuente sin verificar.
+
+[usgs]
+nombre = "USGS Earthquake Hazards Program (ComCat)"
+protocolo = "fdsnws-event"
+url_base = ""
+verificado = false
+verificado_el = ""
+verificado_por = ""
+documentacion = "https://earthquake.usgs.gov/fdsnws/event/1/"
+licencia = "POR VERIFICAR"
+puede_cachearse = false
+cobertura = "global; completitud regional muy variable"
+notas = "Catalogo global de referencia. Verificar limite maximo de eventos por consulta."
+
+[ssn_unam]
+nombre = "Servicio Sismologico Nacional (UNAM, Mexico)"
+protocolo = "POR DETERMINAR"
+url_base = ""
+verificado = false
+verificado_el = ""
+verificado_por = ""
+documentacion = "http://www.ssn.unam.mx/catalogo/"
+licencia = "POR VERIFICAR"
+puede_cachearse = false
+cobertura = "Mexico; registros desde 1900, mas de 200 000 eventos en catalogo"
+notas = """
+Fuente primaria para la region elegida (Cocos/Rivera + Faja Volcanica
+Transmexicana). PENDIENTE CRITICO: determinar si ofrece servicio FDSN o solo
+formulario web y descarga manual; de eso depende todo el diseno del conector.
+Existe ademas un catalogo de sismos historicos en sismoshistoricos.ssn.unam.mx,
+con estructura distinta (intensidades macrosismicas, no instrumental).
+Verificar requisito de citacion: es habitual que se exija reconocimiento
+explicito al SSN en toda publicacion que use sus datos.
+"""
+
+[gcmt]
+nombre = "Global Centroid Moment Tensor"
+protocolo = "descarga de fichero"
+url_base = ""
+verificado = false
+verificado_el = ""
+verificado_por = ""
+documentacion = "https://www.globalcmt.org/"
+licencia = "POR VERIFICAR"
+puede_cachearse = false
+cobertura = "global, M >= 5.0 aproximadamente; mecanismos focales y Mw"
+notas = """
+Necesario como referencia de Mw para la homogenizacion de magnitudes: es la
+fuente de Mw contra la que se calibran las regresiones de conversion desde
+otras escalas. Verificar el formato del fichero de soluciones.
+"""
+
+[isc]
+nombre = "International Seismological Centre"
+protocolo = "POR DETERMINAR"
+url_base = ""
+verificado = false
+verificado_el = ""
+verificado_por = ""
+documentacion = "http://www.isc.ac.uk/iscbulletin/"
+licencia = "POR VERIFICAR"
+puede_cachearse = false
+cobertura = "global; boletin revisado con retraso de aproximadamente dos anios"
+notas = "Verificar limites de consulta automatizada; el ISC los aplica."
