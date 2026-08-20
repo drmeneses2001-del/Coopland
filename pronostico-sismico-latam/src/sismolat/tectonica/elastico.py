@@ -277,17 +277,43 @@ def error_de_superficie_libre(
     traccion = np.einsum("nij,j->ni", sigma_sup, normal_sup)
     mag_traccion = np.linalg.norm(traccion, axis=1)
 
-    # Referencia: esfuerzo a la profundidad de la falla, a una distancia tipica.
+    # Referencia: esfuerzo sobre una rejilla a la profundidad de la falla, la misma
+    # extension que la de superficie. Se comparan magnitudes homologas --maximo con
+    # maximo y mediana con mediana--: cotejar el maximo de una con la mediana de la
+    # otra infla la razon y hace parecer inutilizable un calculo que no lo es.
     z_falla = falla.centro_km[2]
-    ref_puntos = np.column_stack([
-        np.linspace(5.0, lim, n), np.zeros(n), np.full(n, z_falla)])
+    ref_puntos = np.column_stack([gx.ravel(), gy.ravel(), np.full(gx.size, z_falla)])
     sigma_ref = esfuerzo_falla_finita(ref_puntos, falla, medio)
-    ref = float(np.median(np.abs(sigma_ref).max(axis=(1, 2))))
+    mag_ref = np.abs(sigma_ref).max(axis=(1, 2))
+    # Se excluyen los puntos pegados a la falla, donde la suma de parches diverge.
+    dist_centro = np.linalg.norm(ref_puntos - np.asarray(falla.centro_km), axis=1)
+    lejos = dist_centro > 0.5 * math.hypot(falla.largo_km, falla.ancho_km)
+    if not lejos.any():
+        lejos = np.ones(mag_ref.size, dtype=bool)
+    ref_max = float(mag_ref[lejos].max())
+    ref_mediana = float(np.median(mag_ref[lejos]))
+
+    razon_max = float(mag_traccion.max() / ref_max) if ref_max > 0 else float("inf")
+    razon_mediana = (float(np.median(mag_traccion) / ref_mediana)
+                     if ref_mediana > 0 else float("inf"))
+    if razon_mediana < 0.1:
+        lectura = ("El error de superficie libre es pequeno frente a los esfuerzos de "
+                   "interes: el resultado es utilizable con la salvedad declarada.")
+    elif razon_mediana < 0.5:
+        lectura = ("El error de superficie libre es apreciable: usa el resultado de forma "
+                   "cualitativa (donde sube y donde baja), no cuantitativa.")
+    else:
+        lectura = ("El error de superficie libre es del orden de los esfuerzos de interes: "
+                   "para esta geometria el modelo de medio infinito NO es utilizable. Hace "
+                   "falta una solucion de semiespacio.")
 
     return {
         "traccion_maxima_pa": float(mag_traccion.max()),
-        "traccion_media_pa": float(mag_traccion.mean()),
-        "esfuerzo_referencia_pa": ref,
-        "razon_maxima": float(mag_traccion.max() / ref) if ref > 0 else float("inf"),
+        "traccion_mediana_pa": float(np.median(mag_traccion)),
+        "esfuerzo_referencia_maximo_pa": ref_max,
+        "esfuerzo_referencia_mediano_pa": ref_mediana,
+        "razon_maxima": razon_max,
+        "razon_mediana": razon_mediana,
         "profundidad_falla_km": abs(z_falla),
+        "interpretacion": lectura,
     }
