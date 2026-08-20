@@ -3,30 +3,35 @@
 Lista explícita, exigida por el plan de entrega ("al terminar cada fase, entrega
 … una lista explícita de lo que quedó sin verificar").
 
-## Revisión disciplinar: pendiente
+## Sobre la revisión disciplinar
 
-**Ningún sismólogo ha revisado este código.** El proyecto es de uso exclusivo y
-personal hasta que exista esa revisión.
+El proyecto es de **uso personal y de aprendizaje**, y para ese alcance no
+requiere revisión externa. La distinción que importa mantener:
 
-Las pruebas de recuperación de parámetros comprueban que el código implementa
-correctamente las fórmulas. **No comprueban** que las fórmulas sean las
-adecuadas para un problema concreto, ni que las decisiones metodológicas sean
-defendibles. Esa es una clase de error distinta y el software no puede
-detectarla.
+- Las pruebas verifican que **el código implementa correctamente las fórmulas**.
+- No verifican que **las fórmulas sean las adecuadas** para un problema
+  concreto, ni que las decisiones por defecto sean defendibles en una región
+  determinada. Esa es una clase de error distinta y ningún test la detecta.
 
-Qué convendría que revisara un especialista, por orden de riesgo:
+La segunda categoría no bloquea el uso personal: el programa la señala
+continuamente en lugar de ocultarla. Sí volvería a ser un requisito para
+docencia, publicación o distribución.
 
-1. **Las decisiones metodológicas por defecto**: corrección de MAXC, umbrales de
-   deduplicación, ventana de estabilidad de b, piso del suavizado. Todas están
-   marcadas como `CONVENCION` o `SUPUESTO`, pero ninguna está calibrada para
-   catálogos latinoamericanos.
-2. **La aplicabilidad de Gardner-Knopoff a subducción mexicana**: sus ventanas
-   se calibraron sobre California en los años 70 y las secuencias interfase
-   tienen extensión espacial mucho mayor.
-3. **La formulación de las pruebas basadas en catálogo**, que se apartan
-   deliberadamente del diseño clásico de CSEP por las razones documentadas en
-   `02-supuestos.md`.
-4. **Los coeficientes de `parametros/`**, contra las publicaciones originales.
+Lo que un especialista miraría primero, si alguna vez hay ocasión, por orden de
+riesgo:
+
+1. **Las decisiones por defecto**: corrección de MAXC (+0.2), umbrales de
+   deduplicación (16 s / 100 km / 1.0 mag), ventana de estabilidad de b, piso
+   del suavizado (1 %). Todas están marcadas como `CONVENCION` o `SUPUESTO`,
+   pero ninguna está calibrada para catálogos latinoamericanos.
+2. **La aplicabilidad de Gardner-Knopoff a la subducción mexicana**: sus
+   ventanas se calibraron sobre California en los años 70, y las secuencias
+   interfase tienen extensión espacial mucho mayor.
+3. **La elección de GMM**: el código exige justificación escrita y comprueba el
+   régimen tectónico, pero no puede juzgar la adecuación regional.
+4. **El diseño de las pruebas basadas en catálogo**, que se aparta a propósito
+   del CSEP clásico por las razones de `02-supuestos.md`.
+5. **Los coeficientes de `parametros/`**, contra las publicaciones originales.
 
 ## Sin verificar
 

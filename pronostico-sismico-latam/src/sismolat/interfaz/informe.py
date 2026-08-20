@@ -412,7 +412,7 @@ class Informe:
             + cuerpo
             + f'<p class="pie">Generado por sismolat el {momento}. '
               "Informe autocontenido: no carga recursos externos. "
-              "Proyecto de uso personal, sin revision por un especialista.</p>"
+              "Proyecto de uso personal y de aprendizaje. Las cifras llevan su procedencia; las limitaciones de cada modulo estan declaradas.</p>"
             "</div></div></body></html>"
         )
 

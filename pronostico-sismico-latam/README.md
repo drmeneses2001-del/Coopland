@@ -15,29 +15,41 @@ Faja Volcánica Transmexicana).
 > Lee [`docs/00-contrato-epistemologico.md`](docs/00-contrato-epistemologico.md)
 > antes de usar cualquier resultado.
 
-## Estado de revisión: uso personal, sin revisar por un especialista
+## Alcance: uso personal y ejercicio de aprendizaje
 
-**Ningún sismólogo ha revisado este código todavía.** El autor tiene previsto
-buscar esa revisión; mientras tanto, el proyecto es de **uso exclusivo y
-personal**.
+Este proyecto es de **uso personal**, como exploración y ejercicio. Para eso no
+hace falta ninguna revisión externa, y conviene decirlo claro porque es fácil
+confundir dos cosas distintas:
 
-Qué significa en la práctica:
+**Lo que sí está verificado** — que el código hace lo que las fórmulas dicen.
+No es una promesa: son 392 pruebas, y las importantes son de *recuperación de
+parámetros*, que simulan un catálogo con valores conocidos y comprueban que el
+estimador los recupera. Si no los recuperara, el estimador estaría mal y la
+prueba fallaría. Eso incluye el valor b, Omori–Utsu, los ocho parámetros de
+ETAS, la calibración de las pruebas CSEP y la conservación del momento sísmico.
 
-- **No usar con estudiantes ni en docencia** hasta que haya revisión disciplinar.
-- **No publicar ni comunicar resultados** obtenidos con esta herramienta, en
-  ningún formato, ni siquiera con salvedades.
-- **No distribuir** el paquete ni exponerlo como servicio.
+**Lo que no está verificado** — que las fórmulas y las decisiones por defecto
+sean las adecuadas para un problema concreto. Ninguna prueba puede decidir eso:
+es juicio disciplinar. Ejemplos concretos en este código: si las ventanas de
+Gardner–Knopoff, calibradas en California en los años 70, tienen sentido en la
+subducción mexicana; si `ArroyoEtAl2010SInter` es el GMM adecuado para tu sitio;
+si la corrección de +0.2 en el Mc de máxima curvatura vale para tu catálogo.
 
-La razón no es formalismo. Los estimadores están validados por recuperación de
-parámetros, que comprueba que el **código hace lo que la fórmula dice** — no que
-la fórmula sea la adecuada para un problema concreto, ni que las decisiones
-metodológicas (elección de Mc, de método de decluster, de ventana, de umbral)
-sean defendibles en un contexto real. Eso solo lo puede juzgar alguien con
-formación en la disciplina.
+Para uso personal, esa segunda categoría no es un impedimento: es una lista de
+cosas que el programa te va diciendo mientras trabajas. Cada módulo declara sus
+limitaciones, cada cantidad lleva su procedencia y cada parámetro sin verificar
+contamina lo que deriva de él. Puedes explorar sabiendo dónde pisas.
 
-Se suma a que **ninguna fuente de datos, coeficiente de la literatura ni cita
-bibliográfica está verificada** (ver más abajo). El paquete es, por ahora, un
-motor numérico auditable a la espera de que alguien audite la ciencia.
+### Dónde sí cambiaría la respuesta
+
+La revisión disciplinar vuelve a ser necesaria si algún día quieres:
+
+- **usarlo con estudiantes** o en cualquier contexto docente;
+- **publicar resultados** obtenidos con él, en cualquier formato;
+- **distribuirlo** o exponerlo como servicio (y entonces vuelve también la
+  decisión de licencia por la AGPL de OpenQuake).
+
+Mientras sea tuyo y para aprender, nada de eso aplica.
 
 ---
 
