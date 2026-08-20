@@ -425,9 +425,58 @@
       }
     } catch (e) { /* la carpeta guardada ya no es válida */ }
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(function () { /* sin modo avión */ });
+    conectarServiceWorker();
+  }
+
+  // ------------------------------------------------------- service worker ---
+  // Una caché a medio actualizar puede servir un index.html nuevo con un app.js
+  // viejo, y eso no da una pantalla vieja: da una pantalla rota. Cuando entra
+  // una versión nueva se recarga una sola vez, con un cerrojo para no caer en
+  // un bucle de recargas.
+  var VERSION_APP = 'fases 1–5 · ingesta, índice, grafo, brechas y lienzo';
+
+  function conectarServiceWorker() {
+    $('nota-version').textContent = VERSION_APP;
+    if (!('serviceWorker' in navigator)) {
+      $('nota-version').textContent = VERSION_APP + ' · sin service worker: no habrá modo avión';
+      return;
     }
+    navigator.serviceWorker.addEventListener('message', function (ev) {
+      if (!ev.data || ev.data.t !== 'sw-activado') return;
+      if (sessionStorage.getItem('grafo-recargado') === ev.data.version) return;
+      sessionStorage.setItem('grafo-recargado', ev.data.version);
+      decir('versión nueva instalada · recargando');
+      location.reload();
+    });
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      if (reg.waiting) reg.waiting.postMessage({ t: 'saltar-espera' });
+      reg.addEventListener('updatefound', function () {
+        var nuevo = reg.installing;
+        if (nuevo) nuevo.addEventListener('statechange', function () {
+          if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
+            decir('hay una versión nueva lista');
+          }
+        });
+      });
+    }).catch(function () { /* sin modo avión */ });
+  }
+
+  async function forzarActualizacion() {
+    if (!confirm('Se borra la caché de la aplicación y se vuelve a descargar.\n' +
+                 'Tu índice de documentos NO se toca.\n\n¿Continuar?')) return;
+    decir('limpiando la caché…');
+    try {
+      if ('caches' in self) {
+        var claves = await caches.keys();
+        await Promise.all(claves.map(function (k) { return caches.delete(k); }));
+      }
+      if ('serviceWorker' in navigator) {
+        var registros = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registros.map(function (r) { return r.unregister(); }));
+      }
+    } catch (e) { /* da igual: se recarga de todos modos */ }
+    sessionStorage.removeItem('grafo-recargado');
+    location.reload();
   }
 
   // ------------------------------------------------------------------ eventos
@@ -457,6 +506,7 @@
     await aplicarVacias();
     decir('palabras vacías guardadas · reindexa para aplicarlas al texto ya leído');
   });
+  $('btn-actualizar').addEventListener('click', forzarActualizacion);
   $('btn-persistir').addEventListener('click', async function () {
     if (!navigator.storage || !navigator.storage.persist) { decir('este navegador no ofrece almacenamiento persistente'); return; }
     var ok = await navigator.storage.persist();

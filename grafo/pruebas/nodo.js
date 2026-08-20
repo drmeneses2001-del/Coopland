@@ -68,6 +68,25 @@ const entorno = {
 const disponible = { pdf: !!pdfjsLib, docx: !!mammoth };
 const motivos = { pdf: motivoPdf, docx: motivoDocx };
 
+// Comprobación de coherencia del service worker. Va aquí, en el corredor de
+// Node, porque necesita leer el sistema de archivos: si un módulo se carga en
+// index.html o se abre con `new Worker()` pero no está en la lista del service
+// worker, la aplicación se rompe en avión o —peor— sirve una mezcla de dos
+// versiones al desplegar. Ese fallo ya ocurrió una vez.
+function revisarServiceWorker() {
+  const html = fs.readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  const sw = fs.readFileSync(path.join(raiz, 'sw.js'), 'utf8');
+  const enSw = new Set((sw.match(/'\.\/[^']+'/g) || []).map(x => x.slice(3, -1)));
+
+  const enHtml = (html.match(/src="([^"]+\.js)"/g) || []).map(x => x.slice(5, -1));
+  const workers = fs.readdirSync(path.join(raiz, 'js/trabajadores'))
+    .filter(f => f.endsWith('.js')).map(f => 'js/trabajadores/' + f);
+  const css = (html.match(/href="([^"]+\.css)"/g) || []).map(x => x.slice(6, -1));
+
+  const faltan = [...enHtml, ...workers, ...css].filter(f => !enSw.has(f));
+  return { faltan, total: enHtml.length + workers.length + css.length };
+}
+
 (async function () {
   const { casos } = require('./casos.js');
   let ok = 0, fallos = 0, omitidos = 0, grupoActual = '';
@@ -90,6 +109,18 @@ const motivos = { pdf: motivoPdf, docx: motivoDocx };
       console.log('        ' + e.message);
       errores.push({ grupo: c.grupo, nombre: c.nombre, error: e.message, pila: e.stack });
     }
+  }
+
+  // --- coherencia del service worker ---
+  console.log('\n  service worker');
+  const sw = revisarServiceWorker();
+  if (sw.faltan.length) {
+    fallos++;
+    console.log('    ✗ todos los módulos cargados están en la caché del service worker');
+    console.log('        faltan en sw.js: ' + sw.faltan.join(', '));
+  } else {
+    ok++;
+    console.log('    ✓ todos los módulos cargados están en la caché del service worker (' + sw.total + ')');
   }
 
   console.log('\n  ' + ok + ' correctas · ' + fallos + ' fallidas · ' + omitidos + ' omitidas\n');
