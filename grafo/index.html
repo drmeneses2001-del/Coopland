@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="color-scheme" content="dark">
+<title>Grafo de conocimiento</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2316181b'/%3E%3Cg stroke='%236db6e8' stroke-width='1.4' fill='none'%3E%3Cpath d='M8 22 L16 9 L24 22 M8 22 L24 22 M16 9 L16 22'/%3E%3C/g%3E%3Cg fill='%235fd39b'%3E%3Ccircle cx='16' cy='9' r='3'/%3E%3Ccircle cx='8' cy='22' r='2.6'/%3E%3Ccircle cx='24' cy='22' r='2.6'/%3E%3Ccircle cx='16' cy='22' r='2.2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+
+<header class="principal">
+  <h1>Grafo de conocimiento</h1>
+  <span class="fase">Fases 1–3 · ingesta, índice y grafo</span>
+  <span class="estado" id="estado-global">iniciando…</span>
+</header>
+
+<div class="envoltorio">
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-capacidades">
+    <h2>Capacidades del dispositivo <span class="cuenta" id="ruta-elegida"></span></h2>
+    <p class="nota">
+      Nada aquí se deduce del navegador declarado: cada ruta se sondea en tiempo de ejecución.
+      El caso de <code>webkitdirectory</code> en iPadOS es contradictorio en la documentación,
+      así que además del sondeo hay una <b>verificación empírica</b>: se abre el selector una vez
+      y se comprueba si de verdad llegan rutas de carpeta. El resultado queda guardado.
+    </p>
+    <div class="rejilla" id="rejilla-rutas"></div>
+    <div class="acciones">
+      <button class="menor" id="btn-verificar-b">Verificar ruta B en este iPad</button>
+      <button class="menor" id="btn-reset-verif">Olvidar verificaciones</button>
+    </div>
+    <details class="plegable" id="detalles-entorno">
+      <summary>Entorno de ejecución</summary>
+      <div class="desplaza"><table class="datos" id="tabla-entorno"></table></div>
+    </details>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-ingesta">
+    <h2>Carpeta</h2>
+    <p class="nota" id="nota-ingesta"></p>
+    <div class="acciones" id="acciones-ingesta"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-progreso" hidden>
+    <h2>Indexando</h2>
+    <div class="progreso">
+      <div class="linea"><span id="progreso-fase">preparando</span><span id="progreso-cuenta">0 / 0</span></div>
+      <div class="barra"><i id="progreso-barra"></i></div>
+      <div class="encurso" id="progreso-encurso"></div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-resumen" hidden>
+    <h2>Índice</h2>
+    <div class="cifras" id="cifras-indice"></div>
+    <details class="plegable">
+      <summary>Reparto por extensión</summary>
+      <div class="desplaza"><table class="datos" id="tabla-extensiones"></table></div>
+    </details>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-cambios" hidden>
+    <h2>Qué cambió <span class="cuenta" id="cambios-fecha"></span></h2>
+    <div id="contenido-cambios"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-errores" hidden>
+    <h2>No leídos <span class="cuenta" id="errores-cuenta"></span></h2>
+    <p class="nota">
+      Ningún documento de esta lista aporta contenido al grafo. No se rellena nada:
+      un documento ilegible se queda ilegible y visible.
+    </p>
+    <div class="tabla-alta desplaza"><table class="datos" id="tabla-errores"></table></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-inventario" hidden>
+    <h2>Documentos <span class="cuenta" id="inventario-cuenta"></span></h2>
+    <label class="campo" for="filtro-inventario">Filtrar por ruta o extensión</label>
+    <input type="text" id="filtro-inventario" placeholder="p. ej. clinica/ o .pdf" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="tabla-alta desplaza" style="margin-top:8px"><table class="datos" id="tabla-inventario"></table></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-conceptos" hidden>
+    <h2>Vocabulario <span class="cuenta" id="conceptos-cuenta"></span></h2>
+    <p class="nota">
+      Conteo por documento, no por repetición. El grafo de co-ocurrencia,
+      las comunidades y la intermediación llegan en la Fase 3.
+    </p>
+    <div class="fichas-conceptos" id="lista-conceptos"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-grafo" hidden>
+    <h2>Grafo <span class="cuenta" id="grafo-fecha"></span></h2>
+
+    <div class="acciones" id="acciones-grafo">
+      <button class="primario" id="btn-construir-grafo">Construir el grafo</button>
+      <span class="etiqueta" id="grafo-estado"></span>
+    </div>
+
+    <div class="progreso" id="progreso-grafo" hidden style="margin-top:12px">
+      <div class="linea"><span id="grafo-fase">preparando</span><span id="grafo-cuenta"></span></div>
+      <div class="barra"><i id="grafo-barra"></i></div>
+    </div>
+
+    <div id="grafo-contenido" hidden>
+
+      <!-- ============================ el lienzo ============================ -->
+      <div class="mapa" id="mapa">
+        <div class="mapa-lienzo">
+          <canvas id="lienzo"></canvas>
+          <div class="hud" id="hud"></div>
+          <div class="aviso-lienzo" id="aviso-lienzo" hidden></div>
+          <div class="ficha-nodo" id="ficha-nodo" hidden></div>
+          <div class="menu-contextual" id="menu-contextual" hidden></div>
+          <button class="plegar-panel" id="btn-plegar-panel" aria-expanded="true"
+                  title="Plegar el panel">&rsaquo;</button>
+          <div class="tiempo" id="tiempo" hidden>
+            <input type="range" id="deslizador-tiempo" min="0" max="0" step="1" value="0">
+            <div class="tiempo-pie">
+              <span id="tiempo-marca-inicio"></span>
+              <span id="tiempo-etiqueta">estado actual</span>
+              <button class="menor" id="btn-tiempo-actual">Presente</button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="panel-lateral" id="panel-lateral">
+          <div class="conmutador" id="panel-pestanas" role="tablist">
+            <button role="tab" data-pestana="temas" aria-selected="true">Temas</button>
+            <button role="tab" data-pestana="brechas" aria-selected="false">Brechas</button>
+            <button role="tab" data-pestana="relaciones" aria-selected="false">Relaciones</button>
+            <button role="tab" data-pestana="estructura" aria-selected="false">Estructura</button>
+            <button role="tab" data-pestana="evolucion" aria-selected="false">Evolución</button>
+          </div>
+
+          <div class="panel-cuerpo">
+            <div class="pestana" data-pestana="temas">
+<div class="diversidad" id="medidor-diversidad"></div>
+
+        
+              <section class="bloque">
+                <h2>Temas <span class="cuenta" id="temas-cuenta"></span></h2>
+                <div class="barra-reparto" id="reparto-comunidades"></div>
+                <div id="lista-comunidades"></div>
+              </section>
+            </div>
+
+            <div class="pestana" data-pestana="brechas" hidden>
+              <div class="cifras" id="cifras-brechas"></div>
+        <p class="nota" style="margin-top:12px">
+          Una brecha no es «dos cosas que no se tocan»: en un grafo grande eso son
+          millones de pares y ninguno significa nada. Aquí una brecha es una
+          ausencia estructuralmente improbable, y de cada una sale una pregunta
+          que puedes llevarte tal cual.
+        </p>
+
+        <div class="grupo-brechas">
+          <h3>Brechas estructurales <span class="cuenta" id="cuenta-estructurales"></span></h3>
+          <p class="nota">
+            Pares de comunidades densas por dentro y casi sin aristas entre sí.
+            Ordenadas por <b>peso × facilidad de puente</b>: una brecha entre dos
+            territorios grandes separados por dos saltos vale más que una entre
+            dos marginales separados por seis.
+          </p>
+          <div id="lista-estructurales"></div>
+        </div>
+
+        <div class="grupo-brechas">
+          <h3>Documentos aislados <span class="cuenta" id="cuenta-aislados-brecha"></span></h3>
+          <p class="nota">
+            Muchos conceptos propios, ninguna dependencia explícita. Es la firma
+            del texto que escribiste y nunca volviste a conectar con nada.
+          </p>
+          <div id="lista-aislados-brecha"></div>
+        </div>
+
+        <div class="grupo-brechas">
+          <h3>Conceptos puente ausentes <span class="cuenta" id="cuenta-puentes"></span></h3>
+          <p class="nota">
+            Un término que vive con dos comunidades distintas, pero al que ningún
+            documento junta con ambas a la vez. El puente existe en el agregado
+            del archivo y no existe en ningún texto concreto.
+          </p>
+          <div id="lista-puentes"></div>
+        </div>
+
+        <details class="plegable">
+          <summary>Cómo se calcularon</summary>
+          <div class="desplaza"><table class="datos" id="tabla-parametros-brechas"></table></div>
+        </details>
+
+            </div>
+
+            <div class="pestana" data-pestana="relaciones" hidden>
+              <div class="cifras" id="cifras-documentos"></div>
+
+        <section class="bloque">
+          <h2>Dependencias explícitas <span class="cuenta" id="dependencias-cuenta"></span></h2>
+          <p class="nota">
+            Alguien escribió estos enlaces: wikilinks, enlaces relativos, rutas
+            citadas, referencias bibliográficas repetidas y secuencias de versión.
+            Son hechos, no estadística — por eso se dibujan con línea sólida.
+          </p>
+          <div class="acciones" style="margin:0 0 8px">
+            <span class="arista-tipo enlace">enlace</span>
+            <span class="arista-tipo referencia">referencia compartida</span>
+            <span class="arista-tipo version">versión</span>
+          </div>
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-dependencias"></table></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Afinidad semántica <span class="cuenta" id="afinidades-cuenta"></span></h2>
+          <p class="nota">
+            Coseno TF-IDF entre documentos: dos textos que comparten vocabulario
+            poco común. Es una estadística, no una decisión de quien escribió —
+            por eso va con línea punteada y umbral ajustable.
+          </p>
+          <p class="pendiente">El umbral se ajusta en la barra de abajo, bajo el lienzo.</p>
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-afinidades"></table></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Documentos aislados <span class="cuenta" id="aislados-cuenta"></span></h2>
+          <p class="nota">
+            Ricos en contenido, sin ninguna dependencia explícita. Es la firma
+            estructural del texto que escribiste y nunca volviste a conectar con
+            nada. La Fase 4 los convertirá en preguntas.
+          </p>
+          <div class="desplaza"><table class="datos" id="tabla-aislados"></table></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Enlaces sin destino <span class="cuenta" id="sinresolver-cuenta"></span></h2>
+          <p class="nota">Enlaces escritos que no apuntan a ningún documento del índice. No se inventa el destino: se listan.</p>
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-sinresolver"></table></div>
+        </section>
+
+            </div>
+
+            <div class="pestana" data-pestana="estructura" hidden>
+              <div class="cifras" id="cifras-grafo"></div>
+              <div class="aviso-corte" id="grafo-corte"></div>
+              <section class="bloque">
+                <h2>Conceptos más influyentes</h2>
+                <p class="nota">
+                  Ordenados por intermediación (betweenness): en cuántos caminos
+                  mínimos entre otros dos conceptos aparece cada uno. Es lo que
+                  determina el tamaño del nodo en el lienzo.
+                </p>
+                <div class="tabla-alta desplaza"><table class="datos" id="tabla-influyentes"></table></div>
+              </section>
+              <section class="bloque">
+                <h2>Puntos conectores del discurso</h2>
+                <p class="nota">
+                  Intermediación alta en relación con lo poco que se repiten: unen
+                  territorios sin ser protagonistas. Son invisibles para cualquier
+                  recuento de frecuencia.
+                </p>
+                <div class="tabla-alta desplaza"><table class="datos" id="tabla-conectores"></table></div>
+              </section>
+              <section class="bloque">
+                <h2>Capa mixta</h2>
+                <div class="cifras" id="cifras-mixta"></div>
+        <p class="nota" style="margin-top:12px">
+          Documentos y conceptos en el mismo lienzo, unidos por aristas de
+          pertenencia. Los índices inversos ya están calculados y guardados: son
+          los que harán instantáneo, en la Fase 5, iluminar los documentos de un
+          concepto o desplegar el subgrafo de un documento.
+        </p>
+        <section class="bloque">
+          <h2>Documentos sin ningún concepto <span class="cuenta" id="huerfanos-cuenta"></span></h2>
+          <div class="desplaza"><table class="datos" id="tabla-huerfanos"></table></div>
+        </section>
+
+              </section>
+            </div>
+
+            <div class="pestana" data-pestana="evolucion" hidden>
+              <p class="nota">
+                Cada construcción del grafo deja una instantánea. El deslizador de
+                abajo recorre esos estados: ver crecer el propio pensamiento es la
+                razón de ser de esta aplicación.
+              </p>
+              <div class="cifras" id="cifras-evolucion"></div>
+              <div class="desplaza"><table class="datos" id="tabla-historial"></table></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- ============================ controles ============================ -->
+      <div class="barra-mapa">
+        <input type="search" id="busqueda" placeholder="Buscar concepto o documento"
+               autocapitalize="off" autocorrect="off" spellcheck="false">
+        <div class="conmutador compacto" id="conmutador-capas" role="tablist">
+          <button role="tab" aria-selected="true" data-capa="conceptos">Conceptos</button>
+          <button role="tab" aria-selected="false" data-capa="documentos">Documentos</button>
+          <button role="tab" aria-selected="false" data-capa="mixta">Mixta</button>
+        </div>
+        <button class="menor" id="btn-dimension" aria-pressed="false">2D</button>
+        <label class="control-linea">afinidad <span id="umbral-valor">0.12</span>
+          <input type="range" id="umbral-afinidad" min="0.05" max="0.9" step="0.01" value="0.12">
+        </label>
+        <label class="control-linea">tipo
+          <select id="filtro-tipo"><option value="">todos</option></select>
+        </label>
+        <label class="control-linea">desde <span id="fecha-valor">todo</span>
+          <input type="range" id="filtro-fecha" min="0" max="100" step="1" value="0">
+        </label>
+        <button class="menor" id="btn-encuadrar">Encuadrar</button>
+        <button class="menor" id="btn-ruta">Ruta de lectura</button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-exportar" hidden>
+    <h2>Exportar</h2>
+    <p class="nota">
+      El informe está pensado para <b>volver a la carpeta que indexas</b>: lleva
+      enlaces relativos a los documentos que menciona, así que la próxima vez que
+      abras la aplicación entrará como un documento más y esos enlaces se
+      convertirán en dependencias del grafo. El sistema se alimenta de sí mismo.
+    </p>
+    <div class="acciones">
+      <button class="menor primario" id="btn-exp-informe">informe.md</button>
+      <button class="menor" id="btn-exp-json">grafo.json</button>
+      <button class="menor" id="btn-exp-csv">conceptos.csv</button>
+      <button class="menor" id="btn-exp-png">lienzo.png</button>
+    </div>
+    <p class="pendiente" id="exportar-estado"></p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section class="bloque">
+    <h2>Ajustes</h2>
+    <details class="plegable">
+      <summary>Palabras vacías propias</summary>
+      <div>
+        <p class="nota">
+          Una por línea o separadas por comas. Se suman a la lista base bilingüe
+          (español e inglés). Cambiarlas obliga a reindexar para que surtan efecto.
+        </p>
+        <textarea id="vacias-propias" rows="4" placeholder="paciente&#10;consulta&#10;hospital"></textarea>
+        <div class="acciones">
+          <button class="menor" id="btn-guardar-vacias">Guardar</button>
+          <span class="etiqueta" id="vacias-cuenta"></span>
+        </div>
+      </div>
+    </details>
+    <details class="plegable">
+      <summary>Almacenamiento</summary>
+      <div>
+        <p class="nota" id="nota-espacio">—</p>
+        <div class="acciones">
+          <button class="menor" id="btn-persistir">Pedir almacenamiento persistente</button>
+          <button class="menor peligro" id="btn-borrar">Borrar el índice completo</button>
+        </div>
+      </div>
+    </details>
+    <details class="plegable">
+      <summary>Versión y actualización</summary>
+      <div>
+        <p class="nota" id="nota-version">—</p>
+        <p class="nota">
+          Si la aplicación se queda en una versión antigua o deja de abrir, esto
+          borra la caché del modo avión y vuelve a descargarla. <b>No toca tu
+          índice</b>: los documentos ya leídos siguen ahí.
+        </p>
+        <div class="acciones">
+          <button class="menor" id="btn-actualizar">Forzar actualización</button>
+        </div>
+      </div>
+    </details>
+    <details class="plegable">
+      <summary>Capa de IA · <span id="ia-resumen">apagada</span></summary>
+      <div>
+        <p class="nota">
+          Opcional y <b>apagada por defecto</b>. Sirve para poner nombre a un tema,
+          resumirlo, refinar la pregunta de una brecha o proponer preguntas para un
+          documento aislado. Todo eso ya funciona sin ella, por plantilla: la IA
+          sólo lo mejora.
+        </p>
+        <p class="nota">
+          Lo que sale del dispositivo son <b>listas de términos y nombres de tema</b>,
+          nunca el texto de tus documentos ni sus rutas. Antes de cada envío verás
+          literalmente lo que se transmite, y podrás cancelarlo. Hay además una
+          auditoría automática que bloquea el envío si algo no encaja en esa forma.
+        </p>
+
+        <label class="campo" for="ia-proveedor">Proveedor</label>
+        <select id="ia-proveedor" style="width:100%;min-height:44px"></select>
+
+        <label class="campo" for="ia-modelo">Modelo</label>
+        <select id="ia-modelo" style="width:100%;min-height:44px"></select>
+
+        <div id="ia-direccion-campo" hidden>
+          <label class="campo" for="ia-direccion">Dirección del servicio</label>
+          <input type="text" id="ia-direccion" placeholder="https://…" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <label class="campo" for="ia-clave">Clave · se guarda sólo en este dispositivo</label>
+        <input type="password" id="ia-clave" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <div class="acciones">
+          <button class="menor" id="btn-ia-guardar">Guardar la clave</button>
+          <button class="menor peligro" id="ia-borrar">Borrar la clave</button>
+        </div>
+
+        <label class="campo" style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--texto)">
+          <input type="checkbox" id="ia-activa" style="width:22px;height:22px;flex:0 0 22px">
+          Activar la capa de IA en esta sesión
+        </label>
+        <p class="pendiente" id="ia-estado"></p>
+      </div>
+    </details>
+    <details class="plegable">
+      <summary>Privacidad</summary>
+      <div>
+        <p class="nota">
+          Todo el procesamiento ocurre en este dispositivo. Con la capa de IA apagada
+          —que es como viene— la aplicación no hace ninguna petición de red a ningún
+          servidor: los documentos, sus fragmentos y sus metadatos no salen del navegador.
+        </p>
+        <p class="nota">
+          Con la capa de IA activada, y sólo tras confirmar cada envío por separado,
+          salen listas de términos y nombres de tema hacia el proveedor que elijas.
+          Nunca el texto de un documento, su ruta ni su nombre de archivo. Una auditoría
+          automática recorre cada carga antes de enviarla y la bloquea si contiene
+          cadenas largas, prosa, saltos de línea o campos no declarados.
+        </p>
+      </div>
+    </details>
+  </section>
+
+</div>
+
+<div class="visor" id="visor" hidden>
+  <div class="visor-cabeza">
+    <span class="visor-titulo" id="visor-titulo"></span>
+    <button class="menor" id="btn-cerrar-visor">Cerrar</button>
+  </div>
+  <div class="visor-cuerpo" id="visor-cuerpo"></div>
+</div>
+
+<div class="dialogo" id="dialogo-ia" hidden>
+  <div class="dialogo-caja">
+    <div class="dialogo-cabeza">
+      <span class="dialogo-titulo">Antes de enviar · <span id="ia-previa-titulo"></span></span>
+      <button class="menor" id="btn-ia-cerrar-previa">✕</button>
+    </div>
+    <div class="dialogo-cuerpo" id="ia-previa-cuerpo"></div>
+    <div class="dialogo-pie">
+      <button class="menor" id="btn-ia-cancelar">Cancelar</button>
+      <button class="menor primario" id="btn-ia-enviar">Enviar esto</button>
+    </div>
+  </div>
+</div>
+
+<div class="barra-inferior" id="barra-inferior">
+  <span>docs <b id="bi-docs">—</b></span><span class="sep">│</span>
+  <span>conceptos <b id="bi-conceptos">—</b></span><span class="sep">│</span>
+  <span>palabras <b id="bi-palabras">—</b></span><span class="sep">│</span>
+  <span>no leídos <b id="bi-errores">—</b></span><span class="sep">│</span>
+  <span>arranque <b id="bi-arranque">—</b></span><span class="sep">│</span>
+  <span>último índice <b id="bi-duracion">—</b></span><span class="sep">│</span>
+  <span>conceptos en grafo <b id="bi-grafo-nodos">—</b></span><span class="sep">│</span>
+  <span>comunidades <b id="bi-comunidades">—</b></span><span class="sep">│</span>
+  <span>modularidad <b id="bi-modularidad">—</b></span><span class="sep">│</span>
+  <span>brechas <b id="bi-brechas">—</b></span>
+</div>
+
+<script src="js/nucleo/hash.js"></script>
+<script src="js/nucleo/bytes.js"></script>
+<script src="js/nucleo/vacias.js"></script>
+<script src="js/nucleo/terminos.js"></script>
+<script src="js/nucleo/almacen.js"></script>
+<script src="js/nucleo/diff.js"></script>
+<script src="js/nucleo/indice.js"></script>
+<script src="js/nucleo/pool.js"></script>
+<script src="js/nucleo/indexador.js"></script>
+<script src="js/ingesta/capacidades.js"></script>
+<script src="js/ingesta/ingesta.js"></script>
+<script src="js/grafo/coocurrencia.js"></script>
+<script src="js/grafo/louvain.js"></script>
+<script src="js/grafo/metricas.js"></script>
+<script src="js/grafo/documentos.js"></script>
+<script src="js/grafo/mixta.js"></script>
+<script src="js/grafo/brechas.js"></script>
+<script src="js/grafo/preguntas.js"></script>
+<script src="js/grafo/ruta.js"></script>
+<script src="js/ia/carga.js"></script>
+<script src="js/ia/proveedor.js"></script>
+<script src="js/ia/acciones.js"></script>
+<script src="js/exportar/exportar.js"></script>
+<script src="js/ui/formato.js"></script>
+<script src="js/ui/colores.js"></script>
+<script src="js/lienzo/camara.js"></script>
+<script src="js/lienzo/lienzo.js"></script>
+<script src="js/lienzo/gestos.js"></script>
+<script src="js/ui/vistas.js"></script>
+<script src="js/ui/vistas-grafo.js"></script>
+<script src="js/ui/visor.js"></script>
+<script src="js/ui/ia.js"></script>
+<script src="js/ui/mapa.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

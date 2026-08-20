@@ -1,0 +1,11 @@
+{
+  "name": "Grafo de conocimiento",
+  "short_name": "Grafo",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#16181b",
+  "theme_color": "#16181b",
+  "lang": "es",
+  "description": "Grafo de conocimiento personal construido en el dispositivo a partir de una carpeta de documentos."
+}

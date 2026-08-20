@@ -1,0 +1,504 @@
+/* Instrumento de laboratorio, no panel de analítica.
+   Lienzo oscuro casi neutro. La saturación se reserva para el grafo (Fase 5):
+   en este armazón sólo hay tres acentos funcionales — correcto, aviso, fallo.
+   Sin sombras difusas, sin gradientes, sin esquinas muy redondeadas.
+   Cifras, rutas y métricas siempre en monoespaciada. */
+
+:root {
+  color-scheme: dark;
+
+  --fondo:        oklch(17% 0.006 260);
+  --fondo-alto:   oklch(21% 0.007 260);
+  --fondo-hundido:oklch(14% 0.006 260);
+  --linea:        oklch(30% 0.008 260);
+  --linea-fuerte: oklch(42% 0.010 260);
+
+  --texto:        oklch(92% 0.006 260);
+  --texto-medio:  oklch(72% 0.008 260);
+  --texto-tenue:  oklch(56% 0.008 260);
+
+  --ok:      oklch(74% 0.145 155);
+  --aviso:   oklch(80% 0.140  75);
+  --fallo:   oklch(70% 0.170  25);
+  --activo:  oklch(78% 0.120 235);
+
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --tacto: 44px;           /* objetivo táctil mínimo en iPad */
+  --radio: 3px;
+}
+
+@supports not (color: oklch(50% 0.1 260)) {
+  :root {
+    --fondo: #16181b; --fondo-alto: #1d2024; --fondo-hundido: #111316;
+    --linea: #33373d; --linea-fuerte: #4d525a;
+    --texto: #e7e9ec; --texto-medio: #adb2ba; --texto-tenue: #7f858e;
+    --ok: #5fd39b; --aviso: #e0b451; --fallo: #ec7c6d; --activo: #6db6e8;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html {
+  /* La cabecera es fija: sin este margen, cualquier salto a un control lo deja
+     justo debajo de ella y el dedo toca la cabecera en su lugar. */
+  scroll-padding-top: 72px;
+}
+
+html, body {
+  margin: 0; padding: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: var(--ui);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  padding: 0 0 env(safe-area-inset-bottom);
+  overscroll-behavior-y: none;
+}
+
+.envoltorio { max-width: 1180px; margin: 0 auto; padding: 0 16px 96px; }
+
+/* --- cabecera ----------------------------------------------------------- */
+header.principal {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--fondo);
+  border-bottom: 1px solid var(--linea);
+  padding: 10px 16px calc(10px + env(safe-area-inset-top));
+  padding-top: calc(10px + env(safe-area-inset-top));
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+header.principal h1 {
+  font-size: 15px; font-weight: 600; letter-spacing: 0.02em; margin: 0;
+  text-transform: uppercase;
+}
+header.principal .fase {
+  font-family: var(--mono); font-size: 11px; color: var(--texto-tenue);
+  border: 1px solid var(--linea); padding: 1px 6px; border-radius: var(--radio);
+}
+header.principal .estado { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--texto-medio); }
+
+/* --- secciones ---------------------------------------------------------- */
+section.bloque { margin: 28px 0 0; }
+section.bloque > h2 {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--texto-tenue); margin: 0 0 10px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--linea);
+  display: flex; align-items: center; gap: 10px;
+}
+section.bloque > h2 .cuenta { font-family: var(--mono); color: var(--texto-medio); letter-spacing: 0; }
+.nota { color: var(--texto-medio); font-size: 13.5px; margin: 0 0 12px; max-width: 76ch; }
+.nota code, code { font-family: var(--mono); font-size: 0.92em; color: var(--texto); background: var(--fondo-hundido); padding: 0 4px; border-radius: 2px; }
+
+/* --- rejilla de rutas --------------------------------------------------- */
+.rejilla { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+.ficha {
+  border: 1px solid var(--linea);
+  background: var(--fondo-alto);
+  border-radius: var(--radio);
+  padding: 12px;
+}
+.ficha.elegida { border-color: var(--activo); }
+.ficha h3 { margin: 0 0 6px; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.ficha p { margin: 4px 0 0; font-size: 13px; color: var(--texto-medio); }
+.ficha .motivo { font-family: var(--mono); font-size: 11.5px; color: var(--texto-tenue); }
+
+.punto { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 8px; background: var(--texto-tenue); }
+.punto.si { background: var(--ok); }
+.punto.no { background: var(--fallo); }
+.punto.duda { background: var(--aviso); }
+
+/* --- botones ------------------------------------------------------------ */
+button, .boton {
+  font-family: var(--ui); font-size: 14px; font-weight: 500;
+  min-height: var(--tacto); padding: 0 16px;
+  background: var(--fondo-alto); color: var(--texto);
+  border: 1px solid var(--linea-fuerte); border-radius: var(--radio);
+  cursor: pointer; touch-action: manipulation;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+button:active { background: var(--fondo-hundido); }
+button[disabled] { opacity: 0.4; cursor: default; }
+button.primario { border-color: var(--activo); color: var(--activo); }
+button.peligro { border-color: var(--fallo); color: var(--fallo); }
+button.menor { min-height: 34px; font-size: 12.5px; padding: 0 10px; }
+.acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+/* --- progreso ----------------------------------------------------------- */
+.progreso { border: 1px solid var(--linea); border-radius: var(--radio); background: var(--fondo-alto); padding: 12px; }
+.barra { height: 4px; background: var(--fondo-hundido); border-radius: 2px; overflow: hidden; margin: 8px 0; }
+.barra > i { display: block; height: 100%; background: var(--activo); width: 0; transition: width 120ms linear; }
+.progreso .linea { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--texto-medio); }
+.encurso { margin-top: 8px; font-family: var(--mono); font-size: 11.5px; color: var(--texto-tenue); }
+.encurso div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* --- cifras ------------------------------------------------------------- */
+.cifras { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); background: var(--linea); border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; }
+.cifra { background: var(--fondo-alto); padding: 10px 12px; }
+.cifra b { display: block; font-family: var(--mono); font-size: 22px; font-weight: 500; line-height: 1.1; letter-spacing: -0.01em; }
+.cifra span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texto-tenue); margin-top: 3px; }
+.cifra.ok b { color: var(--ok); } .cifra.aviso b { color: var(--aviso); } .cifra.fallo b { color: var(--fallo); }
+
+/* --- listas y tablas ---------------------------------------------------- */
+table.datos { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.datos th {
+  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--texto-tenue); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--linea); white-space: nowrap;
+}
+table.datos td { padding: 6px 8px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+table.datos td.ruta { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+table.datos td.num { font-family: var(--mono); text-align: right; white-space: nowrap; }
+.desplaza { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tabla-alta { max-height: 420px; overflow-y: auto; border: 1px solid var(--linea); border-radius: var(--radio); }
+
+.etiqueta { font-family: var(--mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--linea-fuerte); border-radius: 2px; color: var(--texto-medio); white-space: nowrap; }
+.etiqueta.ok { color: var(--ok); border-color: color-mix(in oklch, var(--ok) 45%, var(--linea)); }
+.etiqueta.aviso { color: var(--aviso); border-color: color-mix(in oklch, var(--aviso) 45%, var(--linea)); }
+.etiqueta.fallo { color: var(--fallo); border-color: color-mix(in oklch, var(--fallo) 45%, var(--linea)); }
+
+.fichas-conceptos { display: flex; flex-wrap: wrap; gap: 5px; }
+.concepto { font-family: var(--mono); font-size: 11.5px; padding: 2px 7px; border: 1px solid var(--linea); border-radius: var(--radio); color: var(--texto-medio); }
+.concepto b { color: var(--texto); font-weight: 500; }
+.concepto i { font-style: normal; color: var(--texto-tenue); }
+
+.vacio { color: var(--texto-tenue); font-size: 13px; font-style: italic; padding: 8px 0; }
+
+/* --- cambios ------------------------------------------------------------ */
+.cambio { border-left: 2px solid var(--linea-fuerte); padding: 2px 0 2px 10px; margin: 8px 0; }
+.cambio.alta { border-color: var(--ok); }
+.cambio.baja { border-color: var(--fallo); }
+.cambio.mod  { border-color: var(--aviso); }
+.cambio h4 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--texto-medio); font-weight: 600; }
+.pendiente { color: var(--texto-tenue); font-size: 12.5px; font-family: var(--mono); }
+
+/* --- ajustes ------------------------------------------------------------ */
+textarea, input[type="text"] {
+  width: 100%; font-family: var(--mono); font-size: 13px;
+  background: var(--fondo-hundido); color: var(--texto);
+  border: 1px solid var(--linea); border-radius: var(--radio); padding: 8px;
+  min-height: var(--tacto);
+}
+label.campo { display: block; font-size: 12px; color: var(--texto-tenue); text-transform: uppercase; letter-spacing: 0.05em; margin: 12px 0 4px; }
+
+details.plegable { border: 1px solid var(--linea); border-radius: var(--radio); background: var(--fondo-alto); margin-top: 10px; }
+details.plegable > summary { padding: 12px; min-height: var(--tacto); display: flex; align-items: center; cursor: pointer; font-size: 13.5px; list-style: none; }
+details.plegable > summary::-webkit-details-marker { display: none; }
+details.plegable > summary::before { content: '▸'; margin-right: 8px; color: var(--texto-tenue); }
+details.plegable[open] > summary::before { content: '▾'; }
+details.plegable > div { padding: 0 12px 12px; }
+
+/* --- barra inferior ----------------------------------------------------- */
+.barra-inferior {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  background: var(--fondo-hundido); border-top: 1px solid var(--linea);
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+  display: flex; gap: 16px; align-items: center; overflow-x: auto;
+  font-family: var(--mono); font-size: 12px; color: var(--texto-medio);
+}
+.barra-inferior b { color: var(--texto); font-weight: 500; }
+.barra-inferior .sep { color: var(--linea-fuerte); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* --- Fase 3: capas del grafo -------------------------------------------- */
+
+/* Conmutador de capas. Tres estados excluyentes, sin animación: cambiar de
+   capa es cambiar de pregunta, no una transición decorativa. */
+.conmutador { display: flex; gap: 1px; background: var(--linea); border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; margin-bottom: 12px; }
+.conmutador button {
+  flex: 1; min-height: var(--tacto); border: 0; border-radius: 0;
+  background: var(--fondo-hundido); color: var(--texto-tenue);
+  font-size: 13px; letter-spacing: 0.02em; padding: 0 8px;
+}
+.conmutador button[aria-selected="true"] { background: var(--fondo-alto); color: var(--texto); box-shadow: inset 0 -2px 0 var(--activo); }
+
+.capa[hidden] { display: none; }
+
+/* Medidor de diversidad temática: la barra es la modularidad en su rango real,
+   con los cuatro tramos marcados para que la cifra tenga contexto. */
+.diversidad { border: 1px solid var(--linea); border-radius: var(--radio); background: var(--fondo-alto); padding: 12px; }
+.diversidad .cabeza { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.diversidad .etiqueta-grande { font-size: 18px; font-weight: 600; }
+.diversidad .q { font-family: var(--mono); font-size: 13px; color: var(--texto-medio); }
+.diversidad p { margin: 8px 0 0; font-size: 13px; color: var(--texto-medio); }
+.escala { position: relative; height: 22px; margin: 12px 0 4px; }
+.escala .tramos { position: absolute; inset: 0 0 12px; display: flex; gap: 1px; }
+.escala .tramos i { flex: 1; background: var(--fondo-hundido); border-radius: 1px; }
+.escala .tramos i.activo { background: var(--linea-fuerte); }
+.escala .aguja { position: absolute; top: -2px; width: 2px; height: 14px; background: var(--activo); }
+.escala .rotulos { position: absolute; left: 0; right: 0; bottom: 0; display: flex; font-family: var(--mono); font-size: 9.5px; color: var(--texto-tenue); }
+.escala .rotulos span { flex: 1; text-align: center; }
+
+/* Comunidad: el chip de color es el único lugar del armazón donde entra
+   saturación, y viene de la rueda OKLCH, no de una lista fija. */
+.comunidad { border: 1px solid var(--linea); border-left-width: 3px; border-radius: var(--radio); background: var(--fondo-alto); padding: 10px 12px; margin-top: 8px; }
+.comunidad .cabeza { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.comunidad .chip { width: 12px; height: 12px; border-radius: 2px; flex: 0 0 12px; }
+.comunidad .nombre { font-weight: 600; font-size: 13.5px; }
+.comunidad .cifra-com { font-family: var(--mono); font-size: 11.5px; color: var(--texto-medio); margin-left: auto; white-space: nowrap; }
+.comunidad .terminos { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 5px; }
+
+.barra-reparto { display: flex; height: 8px; border-radius: 2px; overflow: hidden; gap: 1px; margin: 4px 0 10px; }
+.barra-reparto i { display: block; min-width: 2px; }
+
+.aviso-corte { font-family: var(--mono); font-size: 11.5px; color: var(--aviso); margin-top: 8px; }
+
+/* Aristas de la capa de documentos: sólida es dependencia, punteada es
+   afinidad. La distinción es el argumento entero de esa capa. */
+.arista-tipo { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--texto-medio); }
+.arista-tipo::before { content: ''; width: 18px; height: 0; border-top: 2px solid var(--texto-medio); }
+.arista-tipo.afinidad::before { border-top-style: dotted; }
+.arista-tipo.enlace::before { border-color: var(--ok); }
+.arista-tipo.version::before { border-color: var(--activo); }
+.arista-tipo.referencia::before { border-color: var(--aviso); }
+
+/* --- Fase 4: brechas ------------------------------------------------------ */
+
+/* Tarjeta de brecha. Los dos extremos, el peso y la pregunta. La jerarquía es
+   deliberada: primero qué territorios son, después cuánto vale cruzarlos, y la
+   pregunta al final, que es lo único que el usuario se lleva. */
+.brecha { border: 1px solid var(--linea); border-radius: var(--radio); background: var(--fondo-alto); padding: 12px; margin-top: 10px; }
+.brecha .extremos { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+.brecha .lado { flex: 1 1 200px; min-width: 0; }
+.brecha .lado h5 { margin: 0 0 5px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texto-tenue); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.brecha .lado .terminos { display: flex; flex-wrap: wrap; gap: 4px; }
+.brecha .lado .docs { margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--texto-tenue); }
+.brecha .lado .docs div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* El hueco entre los dos lados es el dibujo del propio dato: cuanto más lejos
+   están, más largo el trazo, y el trazo es punteado porque el puente no existe. */
+.brecha .hueco { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 74px; padding: 0 4px; }
+.brecha .hueco .traza { width: 100%; border-top: 2px dotted var(--linea-fuerte); margin: 4px 0; }
+.brecha .hueco .saltos { font-family: var(--mono); font-size: 11px; color: var(--texto-medio); white-space: nowrap; }
+.brecha .hueco .saltos.roto { color: var(--fallo); }
+
+.brecha .medidas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--linea); font-family: var(--mono); font-size: 11.5px; color: var(--texto-tenue); }
+.brecha .medidas b { color: var(--texto-medio); font-weight: 500; }
+
+.brecha .pregunta { margin-top: 10px; padding: 10px; border-left: 2px solid var(--activo); background: var(--fondo-hundido); border-radius: 0 var(--radio) var(--radio) 0; }
+.brecha .pregunta p { margin: 0; font-size: 14px; line-height: 1.5; }
+.brecha .pregunta .origen { display: block; margin-top: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--texto-tenue); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.grupo-brechas > h3 { font-size: 13px; font-weight: 600; margin: 22px 0 2px; display: flex; align-items: center; gap: 8px; }
+.grupo-brechas > h3 .cuenta { font-family: var(--mono); font-size: 11.5px; color: var(--texto-tenue); font-weight: 400; }
+.grupo-brechas > p.nota { margin-top: 4px; }
+
+/* --- Fase 5: el lienzo ---------------------------------------------------- */
+
+/* El lienzo manda: ocupa casi toda la altura útil y el panel se le acopla al
+   lado. En vertical el panel pasa debajo, porque un panel de 300 px sobre un
+   iPad en retrato deja el grafo en una ranura. */
+.mapa {
+  /* Posicionado: el botón de plegado se ancla a esta caja. Sin `relative` se
+     anclaba al viewport, quedaba fuera del mapa y `overflow:hidden` lo
+     recortaba: existía en el DOM y no había forma de tocarlo. */
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1px;
+  background: var(--linea);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio);
+  overflow: hidden;
+  margin-top: 12px;
+}
+.mapa.panel-plegado { grid-template-columns: 1fr 0; }
+
+/* La altura la fija el mapa, no su contenido. Sin esto el panel lateral —que
+   es tan alto como sus tablas— estiraba la fila y el lienzo crecía hasta el
+   doble de la pantalla, con la mitad fuera del alcance del dedo. */
+.mapa { height: min(70vh, 760px); }
+.mapa > * { min-height: 0; min-width: 0; }
+
+.mapa-lienzo { position: relative; background: var(--fondo); height: 100%; }
+.mapa-lienzo canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+/* Lectura de instrumento: cifras vivas en monoespaciada, sin caja ni sombra. */
+.hud {
+  position: absolute; top: 8px; left: 10px; pointer-events: none;
+  font-family: var(--mono); font-size: 10.5px; line-height: 1.5;
+  color: var(--texto-tenue); white-space: pre;
+}
+.aviso-lienzo {
+  position: absolute; left: 10px; bottom: 10px; right: 10px;
+  font-family: var(--mono); font-size: 11px; color: var(--aviso);
+  pointer-events: none;
+}
+
+/* Ficha del nodo: aparece sobre el lienzo, anclada abajo a la derecha para no
+   taparlo con el pulgar. */
+/* La ficha se apoya sobre el deslizador temporal, no debajo: con `bottom:10px`
+   sus botones quedaban tapados por la línea de tiempo y no había forma de
+   pulsar «Abrir documento». */
+.mapa-lienzo.con-tiempo .ficha-nodo { bottom: 84px; }
+.ficha-nodo {
+  position: absolute; right: 10px; bottom: 10px; max-width: 300px; z-index: 5;
+  background: var(--fondo-alto); border: 1px solid var(--linea-fuerte);
+  border-radius: var(--radio); padding: 10px 12px;
+}
+.ficha-nodo h4 { margin: 0 0 6px; font-size: 14px; display: flex; align-items: center; gap: 7px; }
+.ficha-nodo .chip { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 10px; }
+.ficha-nodo dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+.ficha-nodo dt { color: var(--texto-tenue); }
+.ficha-nodo dd { margin: 0; font-family: var(--mono); text-align: right; }
+.ficha-nodo .acciones { margin-top: 8px; }
+.ficha-nodo .acciones button { min-height: 34px; font-size: 12px; padding: 0 8px; }
+
+.menu-contextual {
+  position: absolute; z-index: 5; min-width: 210px;
+  background: var(--fondo-alto); border: 1px solid var(--linea-fuerte); border-radius: var(--radio);
+  overflow: hidden;
+}
+.menu-contextual button {
+  display: block; width: 100%; text-align: left; border: 0; border-radius: 0;
+  border-bottom: 1px solid var(--linea); background: transparent;
+  min-height: var(--tacto); padding: 0 12px; font-size: 13.5px;
+}
+.menu-contextual button:last-child { border-bottom: 0; }
+.menu-contextual button:active { background: var(--fondo-hundido); }
+
+/* Panel lateral plegable. */
+.panel-lateral { background: var(--fondo); display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; }
+.mapa.panel-plegado .panel-lateral { display: none; }
+.panel-lateral .conmutador { margin: 0; border: 0; border-bottom: 1px solid var(--linea); border-radius: 0; }
+.panel-lateral .conmutador button { font-size: 11.5px; padding: 0 4px; letter-spacing: 0; }
+.panel-cuerpo { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 12px 16px; flex: 1; min-height: 0; }
+.panel-cuerpo .bloque { margin-top: 18px; }
+.panel-cuerpo .cifras { grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); }
+.panel-cuerpo .cifra b { font-size: 17px; }
+.pestana[hidden] { display: none; }
+
+/* Barra de controles del mapa. Se desplaza en horizontal antes que apilarse:
+   en un iPad, envolver esto en tres filas se come el lienzo. */
+.barra-mapa {
+  display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding: 10px 2px; margin-top: 2px;
+}
+.barra-mapa input[type="search"] { flex: 0 0 190px; min-height: 40px; margin: 0; }
+.barra-mapa .conmutador { margin: 0; flex: 0 0 auto; }
+.barra-mapa .conmutador.compacto button { min-height: 40px; font-size: 12px; padding: 0 10px; }
+.barra-mapa button.menor { min-height: 40px; flex: 0 0 auto; }
+.control-linea {
+  display: flex; align-items: center; gap: 6px; flex: 0 0 auto;
+  font-family: var(--mono); font-size: 11px; color: var(--texto-tenue); white-space: nowrap;
+}
+.control-linea input[type="range"] { width: 110px; min-height: 40px; }
+.control-linea select {
+  font-family: var(--mono); font-size: 12px; min-height: 40px;
+  background: var(--fondo-hundido); color: var(--texto);
+  border: 1px solid var(--linea); border-radius: var(--radio); padding: 0 6px;
+}
+input[type="range"] { accent-color: var(--activo); }
+
+/* Deslizador temporal: el elemento característico. Va pegado al borde inferior
+   del lienzo y muestra las instantáneas como marcas reales, no como una regla
+   decorativa. */
+/* Va sobre el lienzo, pegado a su borde inferior: es donde la especificación
+   lo quiere y, de paso, queda fuera del alcance de la cabecera fija. */
+.tiempo {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+  background: color-mix(in oklch, var(--fondo) 88%, transparent);
+  border-top: 1px solid var(--linea);
+  padding: 6px 12px 8px;
+}
+.tiempo[hidden] { display: none; }
+.tiempo input[type="range"] { width: 100%; min-height: 34px; display: block; }
+.tiempo-pie {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 11px; color: var(--texto-medio);
+  white-space: nowrap; overflow: hidden;
+}
+.tiempo-pie #tiempo-marca-inicio { color: var(--texto-tenue); flex: 0 0 auto; }
+.tiempo-pie #tiempo-etiqueta { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.tiempo-pie button { flex: 0 0 auto; min-height: 32px; }
+
+/* Visor de documento: panel deslizante desde la derecha. Aquí es donde la
+   trazabilidad deja de ser una promesa. */
+.visor {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 92vw); z-index: 40;
+  background: var(--fondo-alto); border-left: 1px solid var(--linea-fuerte);
+  display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+}
+.visor[hidden] { display: none; }
+.visor-cabeza { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--linea); }
+.visor-titulo { font-family: var(--mono); font-size: 12px; color: var(--texto-medio); word-break: break-all; flex: 1; }
+.visor-cuerpo { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px; flex: 1; }
+.texto-documento { font-size: 15px; line-height: 1.65; margin-top: 12px; }
+.oracion { border-radius: 2px; }
+/* El subrayado va por debajo del texto, no como fondo de color: resaltar con
+   relleno convierte el documento en un marcador fluorescente y deja de leerse. */
+.oracion.resaltada {
+  box-shadow: inset 0 -2px 0 var(--activo);
+  background: color-mix(in oklch, var(--activo) 10%, transparent);
+}
+
+@media (max-width: 900px) {
+  .mapa { grid-template-columns: 1fr; grid-template-rows: 52vh 40vh; height: auto; }
+  .mapa.panel-plegado { grid-template-columns: 1fr; grid-template-rows: 52vh; }
+  .panel-lateral { border-top: 1px solid var(--linea); }
+}
+
+/* Plegar el panel: en el iPad en horizontal, 340 px de panel son la diferencia
+   entre ver el grafo y ver una franja de grafo. */
+/* Tirador en el borde derecho del lienzo. Estuvo arriba a la derecha del mapa
+   y tapaba la última pestaña del panel: un control que inutiliza otro control. */
+.plegar-panel {
+  position: absolute; top: 50%; right: 0; transform: translateY(-50%); z-index: 6;
+  width: 22px; min-height: 56px; padding: 0;
+  border-radius: var(--radio) 0 0 var(--radio);
+  font-family: var(--mono); font-size: 14px; line-height: 1;
+  background: var(--fondo-alto); border: 1px solid var(--linea-fuerte); border-radius: var(--radio);
+  color: var(--texto-medio);
+}
+.mapa.panel-plegado .plegar-panel { transform: translateY(-50%) rotate(180deg); }
+
+/* --- Fase 6: capa de IA --------------------------------------------------- */
+
+/* Diálogo de vista previa. Modal de verdad —bloquea el resto— porque autorizar
+   una salida de datos no es algo que deba poder hacerse de refilón. */
+.dialogo {
+  position: fixed; inset: 0; z-index: 60;
+  background: color-mix(in oklch, var(--fondo-hundido) 82%, transparent);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.dialogo[hidden] { display: none; }
+.dialogo-caja {
+  background: var(--fondo-alto); border: 1px solid var(--linea-fuerte); border-radius: var(--radio);
+  width: min(720px, 100%); max-height: min(86vh, 900px); display: flex; flex-direction: column;
+}
+.dialogo-cabeza { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid var(--linea); }
+.dialogo-titulo { font-size: 14px; font-weight: 600; flex: 1; }
+.dialogo-cuerpo { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px; flex: 1; min-height: 0; }
+.dialogo-pie { display: flex; gap: 8px; justify-content: flex-end; padding: 12px; border-top: 1px solid var(--linea); }
+
+/* La carga se enseña tal cual, en monoespaciada y sin recortar: si hubiera que
+   desplazarse para ver el final, la vista previa dejaría de ser una garantía. */
+.carga-ia {
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
+  background: var(--fondo-hundido); border: 1px solid var(--linea); border-radius: var(--radio);
+  padding: 10px; margin: 0; white-space: pre-wrap; word-break: break-word;
+  max-height: 260px; overflow-y: auto;
+}
+.carga-ia.tenue { color: var(--texto-tenue); }
+
+/* Marca de origen: se distingue de un vistazo lo escrito por plantilla de lo
+   que redactó un modelo. */
+.marca-ia {
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--activo); border: 1px solid color-mix(in oklch, var(--activo) 45%, var(--linea));
+  border-radius: 2px; padding: 1px 5px; margin-left: 6px; white-space: nowrap;
+}
+button.ia { border-color: color-mix(in oklch, var(--activo) 50%, var(--linea-fuerte)); color: var(--activo); }
+.resumen-tema:empty { display: none; }
+.resumen-tema {
+  margin-top: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.5;
+  border-left: 2px solid var(--activo); background: var(--fondo-hundido);
+  border-radius: 0 var(--radio) var(--radio) 0;
+}

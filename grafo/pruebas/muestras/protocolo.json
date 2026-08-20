@@ -1,0 +1,8 @@
+{
+  "protocolo": "manejo de insuficiencia cardiaca",
+  "criterios": { "inclusion": ["disnea", "edema"], "exclusion": ["embarazo"] },
+  "seguimiento": [
+    { "visita": 1, "presion_arterial": 148, "peso_corporal": 82 },
+    { "visita": 2, "presion_arterial": 132, "peso_corporal": 79 }
+  ]
+}
