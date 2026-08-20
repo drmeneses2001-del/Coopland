@@ -92,18 +92,26 @@
         'title="' + esc(c.nombre) + '"></i>';
     }).join('');
 
-    $('lista-comunidades').innerHTML = lista.map(function (c) {
+    var conIA = raiz.GC.ui.ia && raiz.GC.ui.ia.activa();
+    $('lista-comunidades').innerHTML = lista.map(function (c, i) {
       var color = COL.deComunidad(c.id);
-      return '<div class="comunidad" style="border-left-color:' + color + '">' +
+      return '<div class="comunidad" id="tema-' + c.id + '" style="border-left-color:' + color + '">' +
         '<div class="cabeza">' +
           '<span class="chip" style="background:' + color + '"></span>' +
-          '<span class="nombre">' + esc(c.nombre || 'sin nombre') + '</span>' +
+          '<span class="nombre" data-nombre-tema="' + c.id + '">' + esc(c.nombre || 'sin nombre') + '</span>' +
           '<span class="cifra-com">' + c.porcentaje.toFixed(1) + '% · ' + F.numero(c.nodos) + ' conceptos · ' +
             F.numero(c.documentos) + ' docs</span>' +
         '</div>' +
         '<div class="terminos">' + c.terminos.map(function (t) {
           return '<span class="concepto"><b>' + esc(t.forma) + '</b> <i>' + F.numero(t.frecuencia) + '</i></span>';
         }).join('') + '</div>' +
+        '<div class="resumen-tema" id="resumen-tema-' + c.id + '"></div>' +
+        (conIA
+          ? '<div class="acciones" style="margin-top:8px">' +
+              '<button class="menor ia" data-ia="nombrar-tema" data-ia-idx="' + i + '">Nombrar con IA</button>' +
+              '<button class="menor ia" data-ia="resumir-tema" data-ia-idx="' + i + '">Resumir con IA</button>' +
+            '</div>'
+          : '') +
       '</div>';
     }).join('') || '<div class="vacio">Sin comunidades.</div>';
   }
@@ -241,8 +249,12 @@
 
   function bloquePregunta(b, indice, grupo) {
     var id = 'preg-' + grupo + '-' + indice;
+    var accionIA = grupo === 'est' ? 'pregunta-puente' : (grupo === 'ais' ? 'preguntas-aislado' : null);
+    var conIA = accionIA && raiz.GC.ui.ia && raiz.GC.ui.ia.activa();
     return '<div class="acciones" style="margin-top:10px">' +
         '<button class="menor" data-pregunta="' + id + '">Tender el puente</button>' +
+        (conIA ? '<button class="menor ia" data-ia="' + accionIA + '" data-ia-idx="' + indice +
+                 '" data-ia-destino="' + id + '">Refinar con IA</button>' : '') +
       '</div>' +
       '<div class="pregunta" id="' + id + '" hidden>' +
         '<p>' + esc(b.pregunta ? b.pregunta.texto : '—') + '</p>' +

@@ -458,3 +458,47 @@ input[type="range"] { accent-color: var(--activo); }
   color: var(--texto-medio);
 }
 .mapa.panel-plegado .plegar-panel { transform: translateY(-50%) rotate(180deg); }
+
+/* --- Fase 6: capa de IA --------------------------------------------------- */
+
+/* Diálogo de vista previa. Modal de verdad —bloquea el resto— porque autorizar
+   una salida de datos no es algo que deba poder hacerse de refilón. */
+.dialogo {
+  position: fixed; inset: 0; z-index: 60;
+  background: color-mix(in oklch, var(--fondo-hundido) 82%, transparent);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.dialogo[hidden] { display: none; }
+.dialogo-caja {
+  background: var(--fondo-alto); border: 1px solid var(--linea-fuerte); border-radius: var(--radio);
+  width: min(720px, 100%); max-height: min(86vh, 900px); display: flex; flex-direction: column;
+}
+.dialogo-cabeza { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid var(--linea); }
+.dialogo-titulo { font-size: 14px; font-weight: 600; flex: 1; }
+.dialogo-cuerpo { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px; flex: 1; min-height: 0; }
+.dialogo-pie { display: flex; gap: 8px; justify-content: flex-end; padding: 12px; border-top: 1px solid var(--linea); }
+
+/* La carga se enseña tal cual, en monoespaciada y sin recortar: si hubiera que
+   desplazarse para ver el final, la vista previa dejaría de ser una garantía. */
+.carga-ia {
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
+  background: var(--fondo-hundido); border: 1px solid var(--linea); border-radius: var(--radio);
+  padding: 10px; margin: 0; white-space: pre-wrap; word-break: break-word;
+  max-height: 260px; overflow-y: auto;
+}
+.carga-ia.tenue { color: var(--texto-tenue); }
+
+/* Marca de origen: se distingue de un vistazo lo escrito por plantilla de lo
+   que redactó un modelo. */
+.marca-ia {
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--activo); border: 1px solid color-mix(in oklch, var(--activo) 45%, var(--linea));
+  border-radius: 2px; padding: 1px 5px; margin-left: 6px; white-space: nowrap;
+}
+button.ia { border-color: color-mix(in oklch, var(--activo) 50%, var(--linea-fuerte)); color: var(--activo); }
+.resumen-tema:empty { display: none; }
+.resumen-tema {
+  margin-top: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.5;
+  border-left: 2px solid var(--activo); background: var(--fondo-hundido);
+  border-radius: 0 var(--radio) var(--radio) 0;
+}

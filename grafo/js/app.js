@@ -120,6 +120,7 @@
       huerfanos: estado.huerfanos
     });
     $('umbral-afinidad').value = String(estado.umbralAfinidad);
+    V.mostrar('bloque-exportar', true);
 
     // El lienzo necesita los arreglos completos, que viven en IndexedDB y no
     // viajan en el resumen: por eso se leen aquí y no llegan por mensaje.
@@ -402,6 +403,10 @@
     await detectarYPintar();
     await aplicarVacias();
 
+    GC.ui.ia.montar();
+    // Activar o desactivar la IA cambia qué botones existen: hay que repintar.
+    GC.ui.ia.alCambiar(function () { if (estado.resumenGrafo) pintarGrafo(); });
+
     // Ruta A: si el permiso sobre la carpeta sigue vigente, el re-escaneo es
     // automático. Si caducó, se pide con un solo toque — no se hace en silencio.
     try {
@@ -484,9 +489,135 @@
     V.inventario(estado.indice.docs, this.value);
   });
   $('btn-construir-grafo').addEventListener('click', function () { construirGrafo(false); });
+  // ----------------------------------------------------------- exportables ---
+  function nombreConFecha(base, ext) {
+    return base + '-' + GC.exportar.fecha(Date.now()) + '.' + ext;
+  }
+
+  async function exportar(que) {
+    if (!estado.capas) { $('exportar-estado').textContent = 'Construye el grafo antes de exportar.'; return; }
+    var estadoEl = $('exportar-estado');
+    try {
+      if (que === 'informe') {
+        var md = GC.exportar.informeMd(estado.capas, estado.resumenGrafo);
+        GC.exportar.descargar(nombreConFecha('informe', 'md'), md, 'text/markdown;charset=utf-8');
+        estadoEl.textContent = 'informe.md descargado · ' + F.bytes(md.length) +
+          '. Guárdalo en la carpeta que indexas para que entre en el próximo grafo.';
+        return;
+      }
+      if (que === 'json') {
+        var datos = JSON.stringify(GC.exportar.grafoJson(estado.capas, estado.resumenGrafo), null, 1);
+        GC.exportar.descargar(nombreConFecha('grafo', 'json'), datos, 'application/json');
+        estadoEl.textContent = 'grafo.json descargado · ' + F.bytes(datos.length);
+        return;
+      }
+      if (que === 'csv') {
+        var csv = GC.exportar.conceptosCsv(estado.capas, estado.resumenGrafo);
+        GC.exportar.descargar(nombreConFecha('conceptos', 'csv'), csv, 'text/csv;charset=utf-8');
+        estadoEl.textContent = 'conceptos.csv descargado · ' + F.numero(estado.capas.conceptos.nodos.length) + ' filas';
+        return;
+      }
+      if (que === 'png') {
+        var lienzo = document.getElementById('lienzo');
+        if (!lienzo || !lienzo.width) { estadoEl.textContent = 'El lienzo todavía no está dibujado.'; return; }
+        await GC.exportar.lienzoAPng(lienzo, nombreConFecha('grafo', 'png'));
+        estadoEl.textContent = 'lienzo.png descargado · ' + lienzo.width + '×' + lienzo.height + ' px';
+        return;
+      }
+    } catch (e) {
+      estadoEl.textContent = 'No se pudo exportar: ' + (e && e.message || e);
+    }
+  }
+
+  // ------------------------------------------------------------ capa de IA ---
+  // El botón de cada tarjeta ejecuta su acción y sustituye lo que había por lo
+  // que devolvió el modelo, marcado como tal. Si la IA está apagada, el usuario
+  // cancela la vista previa o la llamada falla, se queda la versión por
+  // plantilla y no se pierde nada.
+  async function accionIA(boton) {
+    var accion = boton.dataset.ia;
+    var indice = parseInt(boton.dataset.iaIdx, 10);
+    var r = estado.resumenGrafo;
+    if (!r) return;
+
+    var textoOriginal = boton.textContent;
+    boton.disabled = true;
+    boton.textContent = 'pensando…';
+    try {
+      if (accion === 'nombrar-tema' || accion === 'resumir-tema') {
+        var tema = r.comunidades[indice];
+        if (!tema) return;
+        var salida = await GC.ui.ia.ejecutar(accion, tema);
+        if (salida.origen !== 'ia') return;
+        if (accion === 'nombrar-tema') {
+          var destino = document.querySelector('[data-nombre-tema="' + tema.id + '"]');
+          if (destino) destino.innerHTML = F.escapar(salida.texto) + '<span class="marca-ia">IA</span>';
+          tema.nombre = salida.texto;
+        } else {
+          var caja = $('resumen-tema-' + tema.id);
+          if (caja) caja.innerHTML = F.escapar(salida.texto) + '<span class="marca-ia">IA</span>';
+        }
+        return;
+      }
+
+      if (accion === 'pregunta-puente') {
+        var brecha = r.brechas.estructurales[indice];
+        if (!brecha) return;
+        var res = await GC.ui.ia.ejecutar(accion, brecha);
+        if (res.origen !== 'ia') return;
+        pintarPreguntaRefinada(boton, res.texto);
+        return;
+      }
+
+      if (accion === 'preguntas-aislado') {
+        var doc = r.brechas.aislados[indice];
+        if (!doc) return;
+        // La carga se arma con lo que la acción declara, no con el documento:
+        // el nombre corto y sus conceptos, nunca la ruta ni el texto.
+        var datos = {
+          nombreCorto: GC.grafo.preguntas.nombreCorto(doc.ruta),
+          terminosPropios: conceptosDeDocumento(doc.ruta),
+          palabras: doc.palabras,
+          temasCercanos: (r.comunidades || []).slice(0, 4).map(function (c) { return c.nombre; }),
+          pregunta: doc.pregunta
+        };
+        var res2 = await GC.ui.ia.ejecutar(accion, datos);
+        if (res2.origen !== 'ia') return;
+        var lista = Array.isArray(res2.texto) ? res2.texto : [res2.texto];
+        pintarPreguntaRefinada(boton, lista.map(function (x) { return '— ' + x; }).join('\n'));
+        return;
+      }
+    } finally {
+      boton.disabled = false;
+      boton.textContent = textoOriginal;
+    }
+  }
+
+  function pintarPreguntaRefinada(boton, texto) {
+    var caja = document.getElementById(boton.dataset.iaDestino);
+    if (!caja) return;
+    caja.hidden = false;
+    caja.innerHTML = '<p style="white-space:pre-wrap">' + F.escapar(texto) + '</p>' +
+      '<span class="origen">refinada por el modelo<span class="marca-ia">IA</span></span>';
+  }
+
+  // Los conceptos propios de un documento salen del grafo ya calculado, no de
+  // volver a leer el documento.
+  function conceptosDeDocumento(ruta) {
+    if (!estado.capas) return [];
+    var nodos = estado.capas.conceptos.nodos;
+    var salida = [];
+    for (var i = 0; i < nodos.length && salida.length < 14; i++) {
+      if ((nodos[i].rutas || []).indexOf(ruta) !== -1) salida.push(nodos[i].forma);
+    }
+    return salida;
+  }
+
   // «Tender el puente»: la pregunta ya viene calculada por plantilla, así que
   // el botón la revela en el sitio en lugar de abrir nada.
   document.addEventListener('click', function (ev) {
+    var ia = ev.target.closest && ev.target.closest('button[data-ia]');
+    if (ia) { accionIA(ia); return; }
     var b = ev.target.closest && ev.target.closest('button[data-pregunta]');
     if (!b) return;
     var caja = document.getElementById(b.dataset.pregunta);
@@ -505,6 +636,10 @@
     await GC.almacen.config('vaciasPropias', $('vacias-propias').value);
     await aplicarVacias();
     decir('palabras vacías guardadas · reindexa para aplicarlas al texto ya leído');
+  });
+  ['informe', 'json', 'csv', 'png'].forEach(function (q) {
+    var b = $('btn-exp-' + q);
+    if (b) b.addEventListener('click', function () { exportar(q); });
   });
   $('btn-actualizar').addEventListener('click', forzarActualizacion);
   $('btn-persistir').addEventListener('click', async function () {

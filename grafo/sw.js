@@ -15,7 +15,7 @@
    sí van de la caché siempre. Sin red, todo cae a la caché y la app abre igual. */
 'use strict';
 
-var VERSION = 'grafo-v5';   // sube con cada despliegue: invalida la caché anterior
+var VERSION = 'grafo-v7';   // sube con cada despliegue: invalida la caché anterior
 
 var ARMAZON = [
   './',
@@ -60,11 +60,18 @@ var ARMAZON = [
   './js/lienzo/lienzo.js',
   './js/lienzo/gestos.js',
 
+  './js/ia/carga.js',
+  './js/ia/proveedor.js',
+  './js/ia/acciones.js',
+
+  './js/exportar/exportar.js',
+
   './js/ui/formato.js',
   './js/ui/colores.js',
   './js/ui/vistas.js',
   './js/ui/vistas-grafo.js',
   './js/ui/visor.js',
+  './js/ui/ia.js',
   './js/ui/mapa.js',
 
   // Los workers no los pide el documento: los pide `new Worker()`. Si faltan de

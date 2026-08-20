@@ -330,6 +330,24 @@
   </section>
 
   <!-- ---------------------------------------------------------------- -->
+  <section class="bloque" id="bloque-exportar" hidden>
+    <h2>Exportar</h2>
+    <p class="nota">
+      El informe está pensado para <b>volver a la carpeta que indexas</b>: lleva
+      enlaces relativos a los documentos que menciona, así que la próxima vez que
+      abras la aplicación entrará como un documento más y esos enlaces se
+      convertirán en dependencias del grafo. El sistema se alimenta de sí mismo.
+    </p>
+    <div class="acciones">
+      <button class="menor primario" id="btn-exp-informe">informe.md</button>
+      <button class="menor" id="btn-exp-json">grafo.json</button>
+      <button class="menor" id="btn-exp-csv">conceptos.csv</button>
+      <button class="menor" id="btn-exp-png">lienzo.png</button>
+    </div>
+    <p class="pendiente" id="exportar-estado"></p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
   <section class="bloque">
     <h2>Ajustes</h2>
     <details class="plegable">
@@ -371,14 +389,60 @@
       </div>
     </details>
     <details class="plegable">
+      <summary>Capa de IA · <span id="ia-resumen">apagada</span></summary>
+      <div>
+        <p class="nota">
+          Opcional y <b>apagada por defecto</b>. Sirve para poner nombre a un tema,
+          resumirlo, refinar la pregunta de una brecha o proponer preguntas para un
+          documento aislado. Todo eso ya funciona sin ella, por plantilla: la IA
+          sólo lo mejora.
+        </p>
+        <p class="nota">
+          Lo que sale del dispositivo son <b>listas de términos y nombres de tema</b>,
+          nunca el texto de tus documentos ni sus rutas. Antes de cada envío verás
+          literalmente lo que se transmite, y podrás cancelarlo. Hay además una
+          auditoría automática que bloquea el envío si algo no encaja en esa forma.
+        </p>
+
+        <label class="campo" for="ia-proveedor">Proveedor</label>
+        <select id="ia-proveedor" style="width:100%;min-height:44px"></select>
+
+        <label class="campo" for="ia-modelo">Modelo</label>
+        <select id="ia-modelo" style="width:100%;min-height:44px"></select>
+
+        <div id="ia-direccion-campo" hidden>
+          <label class="campo" for="ia-direccion">Dirección del servicio</label>
+          <input type="text" id="ia-direccion" placeholder="https://…" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <label class="campo" for="ia-clave">Clave · se guarda sólo en este dispositivo</label>
+        <input type="password" id="ia-clave" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <div class="acciones">
+          <button class="menor" id="btn-ia-guardar">Guardar la clave</button>
+          <button class="menor peligro" id="ia-borrar">Borrar la clave</button>
+        </div>
+
+        <label class="campo" style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--texto)">
+          <input type="checkbox" id="ia-activa" style="width:22px;height:22px;flex:0 0 22px">
+          Activar la capa de IA en esta sesión
+        </label>
+        <p class="pendiente" id="ia-estado"></p>
+      </div>
+    </details>
+    <details class="plegable">
       <summary>Privacidad</summary>
       <div>
         <p class="nota">
-          Todo el procesamiento ocurre en este dispositivo. Esta aplicación no hace
-          ninguna petición de red a ningún servidor: los documentos, sus fragmentos y
-          sus metadatos no salen del navegador. La capa de IA de la Fase 6 aún no existe;
-          cuando exista estará apagada por defecto y mostrará el contenido exacto de
-          cada envío antes de realizarlo.
+          Todo el procesamiento ocurre en este dispositivo. Con la capa de IA apagada
+          —que es como viene— la aplicación no hace ninguna petición de red a ningún
+          servidor: los documentos, sus fragmentos y sus metadatos no salen del navegador.
+        </p>
+        <p class="nota">
+          Con la capa de IA activada, y sólo tras confirmar cada envío por separado,
+          salen listas de términos y nombres de tema hacia el proveedor que elijas.
+          Nunca el texto de un documento, su ruta ni su nombre de archivo. Una auditoría
+          automática recorre cada carga antes de enviarla y la bloquea si contiene
+          cadenas largas, prosa, saltos de línea o campos no declarados.
         </p>
       </div>
     </details>
@@ -392,6 +456,20 @@
     <button class="menor" id="btn-cerrar-visor">Cerrar</button>
   </div>
   <div class="visor-cuerpo" id="visor-cuerpo"></div>
+</div>
+
+<div class="dialogo" id="dialogo-ia" hidden>
+  <div class="dialogo-caja">
+    <div class="dialogo-cabeza">
+      <span class="dialogo-titulo">Antes de enviar · <span id="ia-previa-titulo"></span></span>
+      <button class="menor" id="btn-ia-cerrar-previa">✕</button>
+    </div>
+    <div class="dialogo-cuerpo" id="ia-previa-cuerpo"></div>
+    <div class="dialogo-pie">
+      <button class="menor" id="btn-ia-cancelar">Cancelar</button>
+      <button class="menor primario" id="btn-ia-enviar">Enviar esto</button>
+    </div>
+  </div>
 </div>
 
 <div class="barra-inferior" id="barra-inferior">
@@ -426,6 +504,10 @@
 <script src="js/grafo/brechas.js"></script>
 <script src="js/grafo/preguntas.js"></script>
 <script src="js/grafo/ruta.js"></script>
+<script src="js/ia/carga.js"></script>
+<script src="js/ia/proveedor.js"></script>
+<script src="js/ia/acciones.js"></script>
+<script src="js/exportar/exportar.js"></script>
 <script src="js/ui/formato.js"></script>
 <script src="js/ui/colores.js"></script>
 <script src="js/lienzo/camara.js"></script>
@@ -434,6 +516,7 @@
 <script src="js/ui/vistas.js"></script>
 <script src="js/ui/vistas-grafo.js"></script>
 <script src="js/ui/visor.js"></script>
+<script src="js/ui/ia.js"></script>
 <script src="js/ui/mapa.js"></script>
 <script src="js/app.js"></script>
 </body>

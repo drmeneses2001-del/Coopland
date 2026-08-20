@@ -18,8 +18,8 @@ existen y se muestran en paneles; el lienzo interactivo llega en la fase 5.
 | 3 | Grafo de tres capas (conceptos, documentos, mixta), comunidades, intermediación, diversidad temática | terminada |
 | 4 | Brechas estructurales, documentos aislados, conceptos puente ausentes | pendiente |
 | 5 | Lienzo, panel lateral, deslizador temporal, visor con trazabilidad, ruta de lectura | terminada |
-| 6 | Capa de IA opcional | pendiente |
-| 7 | Exportables | pendiente |
+| 6 | Capa de IA opcional, apagada por defecto, con auditoría de la carga | terminada |
+| 7 | informe.md, grafo.json, conceptos.csv y PNG del lienzo | terminada |
 
 ## Cómo se abre
 
@@ -378,6 +378,59 @@ mitad fuera del alcance del dedo; el deslizador temporal tapaba los botones de
 la ficha del nodo; el botón de plegar el panel se anclaba al viewport en lugar
 de al mapa y quedaba recortado; y una vez recolocado, tapaba la última pestaña
 del panel. Los cuatro están corregidos y comentados en el sitio.
+
+### La capa de IA
+
+Apagada por defecto, con **dos cerrojos independientes**: la clave vive en
+`localStorage` y persiste; la activación vive en `sessionStorage` y muere al
+cerrar la pestaña. Tener la clave guardada no autoriza a enviar nada — cada
+sesión hay que decir que sí otra vez. Y aun activada, cada acción muestra la
+carga completa antes de salir y espera confirmación.
+
+**La restricción de privacidad no es una convención entre programadores: es
+código que puede fallar.** `js/ia/carga.js` audita cada carga antes de que
+salga y la bloquea si encuentra cadenas de más de 120 caracteres, prosa,
+saltos de línea, campos fuera de una lista blanca explícita, más de 400
+elementos o más de 4 kB. Si alguna cadena tiene cinco palabras o más, además la
+contrasta contra el texto de los documentos indexados y bloquea el envío si
+aparece literalmente. Una acción nueva que quiera enviar otro campo tiene que
+añadirlo a la lista blanca a conciencia, que es justo el momento de pararse a
+pensar. Hay siete pruebas que verifican los bloqueos, incluidas las cuatro
+acciones existentes: cada una construye su carga y la pasa por el auditor.
+
+La separación de responsabilidades es deliberada: `carga(datos)` decide qué
+sale, `mensaje(carga)` redacta el prompt **sólo con la carga ya auditada** —no
+recibe los datos originales—, y `plantilla(datos)` es la respuesta sin IA. Así
+es imposible que la redacción del prompt cuele por detrás un dato que la
+auditoría no vio pasar.
+
+**Proveedor:** Claude vía el SDK oficial de Anthropic, empaquetado para el
+navegador (163 kB) y servido desde `vendor/`. Se carga por importación dinámica
+sólo cuando el usuario activa la capa: con la IA apagada no se descarga ni un
+byte. Las peticiones usan `claude-opus-5` con pensamiento adaptativo, esfuerzo
+por acción (bajo para nombrar un tema, alto para redactar una pregunta puente) y
+respaldo del servidor ante una negativa —con material clínico un clasificador
+puede declinar, y entonces la petición se reintenta en otro modelo dentro de la
+misma llamada—. Una negativa llega con HTTP 200 y contenido vacío, no como
+error, así que el código mira `stop_reason` antes que el contenido. Hay también
+un proveedor «compatible» para cualquier servicio que hable el mismo formato:
+«conectable» no es una promesa, es un segundo proveedor que funciona.
+
+Verificado interceptando la petición real en el navegador: sale
+`claude-opus-5`, `thinking: {type:"adaptive"}`, `fallbacks: "default"` con la
+cabecera `server-side-fallback-2026-07-01`, el encabezado de acceso directo
+desde navegador, y **ni texto de documentos ni rutas de archivo**.
+
+### Los exportables
+
+Los tres formatos de texto se arman con funciones puras —probadas en consola— y
+el navegador sólo descarga. El que importa es el informe: va en Markdown con
+enlaces relativos a los documentos que menciona, de modo que si se guarda en la
+misma carpeta, la próxima indexación lo lee como un documento más y sus enlaces
+se convierten en dependencias explícitas del grafo. **El informe de hoy es
+estructura mañana.** Hay una prueba que cierra ese círculo: genera el informe,
+lo pasa por el parser de Markdown y resuelve sus enlaces contra el propio
+corpus.
 
 ---
 

@@ -21,6 +21,11 @@
       },
       colores: require('../js/ui/colores.js'),
       camara: require('../js/lienzo/camara.js'),
+      ia: {
+        carga: require('../js/ia/carga.js'),
+        acciones: require('../js/ia/acciones.js')
+      },
+      exportar: require('../js/exportar/exportar.js'),
       parsers: {
         texto: require('../js/parsers/texto.js'),
         rtf: require('../js/parsers/rtf.js'),
@@ -37,7 +42,8 @@
       terminos: raiz.GC.terminos, diff: raiz.GC.diff, indice: raiz.GC.indice,
       registro: raiz.GC.registro, parsers: raiz.GC.parsers,
       grafo: raiz.GC.grafo, colores: raiz.GC.ui.colores,
-      camara: raiz.GC.lienzo ? raiz.GC.lienzo.camara : null
+      camara: raiz.GC.lienzo ? raiz.GC.lienzo.camara : null,
+      ia: raiz.GC.ia, exportar: raiz.GC.exportar
     };
   }
   var api = fabrica(mods);
@@ -1064,6 +1070,277 @@
     var plan = M.grafo.ruta.planDeLectura([0, 1, 2], nodos, docs);
     igual(plan.documentos.join(','), '1.md,2.md');
     afirmar(plan.pasos[2].yaCubierto === true, 'el tramo ya cubierto se declara, no se rellena con un repetido');
+  });
+
+
+  // ====================== Fase 6: la capa de IA ==============================
+
+  caso('IA: auditoría de la carga', 'una lista de términos pasa', function () {
+    var r = M.ia.carga.revisar({
+      tipo: 'pregunta-puente',
+      terminosA: ['edema', 'disnea', 'ortopnea'],
+      terminosB: ['docencia', 'simulación'],
+      distancia: 2, aristasCruzadas: 1
+    });
+    afirmar(r.seguro, 'motivos: ' + r.motivos.join(' / '));
+    afirmar(r.resumen.bytes < 400, 'una carga legítima es diminuta: ' + r.resumen.bytes + ' bytes');
+  });
+
+  caso('IA: auditoría de la carga', 'una oración de documento se bloquea', function () {
+    var r = M.ia.carga.revisar({
+      tipo: 'resumir-tema',
+      terminos: ['El paciente presentaba disnea de esfuerzo progresiva y edema maleolar. La ecocardiografía mostró hipertrofia ventricular.']
+    });
+    afirmar(!r.seguro, 'esto tenía que bloquearse');
+    afirmar(r.motivos.join(' ').indexOf('prosa') !== -1 || r.motivos.join(' ').indexOf('caracteres') !== -1,
+      'el motivo debe señalar la prosa o la longitud: ' + r.motivos.join(' / '));
+  });
+
+  caso('IA: auditoría de la carga', 'un campo no declarado se bloquea', function () {
+    var r = M.ia.carga.revisar({ tipo: 'x', texto: 'corto' });
+    afirmar(!r.seguro);
+    contiene(r.motivos[0], 'no declarada',
+      'una acción nueva no puede colar un campo sin pasar por la lista');
+  });
+
+  caso('IA: auditoría de la carga', 'los saltos de línea delatan texto de documento', function () {
+    var r = M.ia.carga.revisar({ tipo: 'x', terminos: ['primera linea\nsegunda linea'] });
+    afirmar(!r.seguro);
+    contiene(r.motivos[0], 'saltos de línea');
+  });
+
+  caso('IA: auditoría de la carga', 'hay techo de tamaño y de número de elementos', function () {
+    var muchos = [];
+    for (var i = 0; i < 500; i++) muchos.push('t' + i);
+    afirmar(!M.ia.carga.revisar({ tipo: 'x', terminos: muchos }).seguro, 'demasiados elementos');
+
+    var largos = [];
+    for (var j = 0; j < 200; j++) largos.push('termino-bastante-largo-numero-' + j);
+    var r = M.ia.carga.revisar({ tipo: 'x', terminos: largos });
+    afirmar(!r.seguro, 'debe superar el techo de bytes');
+    afirmar(r.motivos.join(' ').indexOf('bytes') !== -1);
+  });
+
+  caso('IA: auditoría de la carga', 'el contraste con el corpus caza un fragmento literal', function () {
+    var documentos = ['La disnea acompaña al edema pulmonar en la insuficiencia cardiaca descompensada.'];
+    var fuga = M.ia.carga.contrastarConDocumentos(
+      { tipo: 'x', terminos: ['La disnea acompaña al edema pulmonar'] }, documentos);
+    afirmar(!fuga.seguro, 'un fragmento literal del corpus no puede salir');
+    igual(fuga.sospechosas.length, 1);
+
+    var normal = M.ia.carga.contrastarConDocumentos(
+      { tipo: 'x', terminos: ['disnea', 'edema', 'insuficiencia'] }, documentos);
+    afirmar(normal.seguro, 'los términos sueltos SÍ aparecen en los documentos: eso es lo normal');
+  });
+
+  caso('IA: acciones', 'las cuatro acciones existen y todas tienen plantilla', function () {
+    igual(M.ia.acciones.ACCIONES.length, 4);
+    ['nombrar-tema', 'resumir-tema', 'pregunta-puente', 'preguntas-aislado'].forEach(function (id) {
+      var a = M.ia.acciones.obtener(id);
+      afirmar(a, 'falta la acción ' + id);
+      afirmar(typeof a.plantilla === 'function', id + ' no tiene equivalente por plantilla');
+      afirmar(typeof a.carga === 'function' && typeof a.mensaje === 'function');
+    });
+  });
+
+  caso('IA: acciones', 'toda carga generada por las acciones pasa la auditoría', function () {
+    var tema = {
+      id: 0, nombre: 'presión · arterial · reduce', nodos: 8, documentos: 6,
+      terminos: [{ forma: 'presión', lema: 'presion', frecuencia: 6 },
+                 { forma: 'arterial', lema: 'arterial', frecuencia: 9 },
+                 { forma: 'hipertensión', lema: 'hipertension', frecuencia: 4 }]
+    };
+    var brecha = {
+      tipo: 'estructural', comunidadA: 0, comunidadB: 1,
+      terminosA: ['edema', 'disnea'], terminosB: ['docencia', 'simulación'],
+      distancia: 2, sinCamino: false, aristasCruzadas: 1, peso: 0.4,
+      pregunta: { texto: '¿Qué relación hay entre edema y docencia?' }
+    };
+    var aislado = {
+      nombreCorto: 'notas-clinicas', palabras: 740, terminosPropios: ['edema', 'disnea'],
+      temasCercanos: ['presión arterial'], pregunta: { texto: '¿Con qué se conecta?' }
+    };
+
+    [['nombrar-tema', tema], ['resumir-tema', tema],
+     ['pregunta-puente', brecha], ['preguntas-aislado', aislado]].forEach(function (par) {
+      var accion = M.ia.acciones.obtener(par[0]);
+      var carga = accion.carga(par[1]);
+      var r = M.ia.carga.revisar(carga);
+      afirmar(r.seguro, par[0] + ' produce una carga que la auditoría rechaza: ' + r.motivos.join(' / '));
+
+      // Y el mensaje se arma SÓLO con la carga: si necesitara los datos
+      // originales, aparecerían huecos sin rellenar.
+      var mensaje = accion.mensaje(carga);
+      afirmar(mensaje.length > 40, par[0] + ': mensaje demasiado corto');
+      noContiene(mensaje, 'undefined', par[0] + ': hueco sin rellenar en el mensaje');
+      noContiene(mensaje, '[object', par[0] + ': objeto sin formatear en el mensaje');
+    });
+  });
+
+  caso('IA: acciones', 'ninguna carga incluye rutas de archivo', function () {
+    var aislado = {
+      nombreCorto: 'notas-clinicas', palabras: 740,
+      terminosPropios: ['edema'], temasCercanos: [], pregunta: { texto: 'x' },
+      ruta: 'clinica/2024/paciente-1001/notas-clinicas.md'
+    };
+    var carga = M.ia.acciones.obtener('preguntas-aislado').carga(aislado);
+    noContiene(JSON.stringify(carga), 'clinica/', 'la ruta del documento no puede salir del dispositivo');
+    noContiene(JSON.stringify(carga), 'paciente');
+  });
+
+  caso('IA: acciones', 'la instrucción del sistema le prohíbe al modelo inventar contenido', function () {
+    var s = M.ia.acciones.SISTEMA_COMUN;
+    contiene(s, 'nunca ves el texto de los documentos');
+    contiene(s, 'español');
+  });
+
+  caso('IA: acciones', 'las plantillas funcionan sin IA', function () {
+    var tema = {
+      id: 0, nombre: 'x', nodos: 5, documentos: 3,
+      terminos: [{ forma: 'edema', frecuencia: 4 }, { forma: 'disnea', frecuencia: 3 }, { forma: 'ortopnea', frecuencia: 2 }]
+    };
+    igual(M.ia.acciones.obtener('nombrar-tema').plantilla(tema), 'edema · disnea · ortopnea');
+    var resumen = M.ia.acciones.obtener('resumir-tema').plantilla(tema);
+    afirmar(resumen.length > 60, 'el resumen por plantilla tiene que servir por sí solo');
+    contiene(resumen, 'edema');
+  });
+
+  // ====================== Fase 7: exportables ================================
+
+  function capasDeMuestra() {
+    return {
+      fecha: 1755000000000,
+      conceptos: {
+        nodos: [
+          { id: 0, lema: 'edema', forma: 'edema', frecuencia: 9, docs: 3, rutas: ['a.md'] },
+          { id: 1, lema: 'disnea', forma: 'disnea', frecuencia: 6, docs: 2, rutas: ['a.md'] },
+          { id: 2, lema: 'docencia', forma: 'docencia', frecuencia: 4, docs: 1, rutas: ['b.md'] }
+        ],
+        aristas: [{ a: 0, b: 1, peso: 3.4, docs: 2 }],
+        comunidad: [0, 0, 1],
+        intermediacion: [0.5, 0.1, 0],
+        grado: [1, 1, 0],
+        fuerza: [3.4, 3.4, 0],
+        corte: { maxNodos: 3000, minFrecuencia: 2, minPeso: 1, minDocs: 1 },
+        totales: { conceptosVistos: 40, nodosDescartados: 37, aristasDescartadas: 5 }
+      },
+      documentos: {
+        nodos: [
+          { id: 0, ruta: 'clinica/a.md', nombre: 'a.md', ext: 'md', estado: 'ok', palabras: 400, terminos: 30, idioma: 'es' },
+          { id: 1, ruta: 'docencia/b.md', nombre: 'b.md', ext: 'md', estado: 'ok', palabras: 300, terminos: 20, idioma: 'es' }
+        ],
+        dependencias: [{ a: 0, b: 1, tipo: 'enlace', peso: 1 }],
+        afinidades: [{ a: 0, b: 1, coseno: 0.31 }]
+      },
+      mixta: { pertenencias: [], totales: {} },
+      brechas: {
+        estructurales: [{
+          tipo: 'estructural', comunidadA: 0, comunidadB: 1, nodosA: 2, nodosB: 1,
+          terminosA: ['edema', 'disnea'], terminosB: ['docencia'],
+          peso: 0.7, facilidad: 0.5, puntuacion: 0.35, distancia: 2, sinCamino: false,
+          aristasCruzadas: 0, densidadCruzada: 0,
+          documentosA: [{ ruta: 'clinica/a.md', conceptos: 2 }],
+          documentosB: [{ ruta: 'docencia/b.md', conceptos: 1 }],
+          pregunta: { texto: '¿Qué relación hay entre edema y docencia?', origen: 'plantilla' }
+        }],
+        aislados: [{
+          tipo: 'aislado', id: 1, ruta: 'docencia/b.md', palabras: 300, terminos: 20,
+          afines: [{ ruta: 'clinica/a.md', coseno: 0.31 }],
+          pregunta: { texto: '¿Con qué se conecta b?', origen: 'plantilla' }
+        }],
+        puentesAusentes: [],
+        parametros: { aislados: { criterio: 'al menos 20 términos propios' } },
+        totales: { estructurales: 1, aislados: 1, puentesAusentes: 0 }
+      }
+    };
+  }
+
+  function resumenDeMuestra() {
+    return {
+      conceptos: {
+        nodos: 3, aristas: 1, comunidades: 2, modularidad: 0.42,
+        diversidad: { etiqueta: 'Diversa', q: 0.42, explicacion: 'Varios territorios definidos.' },
+        componentes: { cuantas: 2, mayor: 2 },
+        intermediacion: { exacta: true, fuentes: 3 }
+      },
+      comunidades: [
+        { id: 0, nombre: 'edema · disnea', nodos: 2, porcentaje: 66.7, documentos: 1,
+          terminos: [{ forma: 'edema', frecuencia: 9 }, { forma: 'disnea', frecuencia: 6 }] },
+        { id: 1, nombre: 'docencia', nodos: 1, porcentaje: 33.3, documentos: 1,
+          terminos: [{ forma: 'docencia', frecuencia: 4 }] }
+      ],
+      influyentes: [{ id: 0, forma: 'edema', intermediacion: 0.5, frecuencia: 9, docs: 3, grado: 1 }],
+      conectores: [{ id: 0, forma: 'edema', razon: 2.1, intermediacion: 0.5, frecuencia: 9, docs: 3 }],
+      documentos: {
+        totales: { documentos: 2, dependencias: 1, afinidades: 1, enlacesSinResolver: 1 },
+        sinResolver: [{ desde: 'clinica/a.md', destino: 'no-existe.md', motivo: 'sin destino' }]
+      }
+    };
+  }
+
+  caso('exportar', 'grafo.json lleva nodos, aristas, métricas y comunidades', function () {
+    var j = M.exportar.grafoJson(capasDeMuestra(), resumenDeMuestra());
+    igual(j.conceptos.nodos.length, 3);
+    igual(j.conceptos.aristas.length, 1);
+    igual(j.comunidades.length, 2);
+    igual(j.metricas.modularidad, 0.42);
+    igual(j.conceptos.nodos[0].comunidad, 0);
+    afirmar(j.conceptos.nodos[0].intermediacion === 0.5, 'la intermediación viaja por nodo');
+    // Tiene que poder serializarse: es un archivo, no una estructura viva.
+    afirmar(JSON.parse(JSON.stringify(j)).conceptos.nodos.length === 3);
+  });
+
+  caso('exportar', 'conceptos.csv escapa, lleva BOM y una fila por concepto', function () {
+    var csv = M.exportar.conceptosCsv(capasDeMuestra(), resumenDeMuestra());
+    afirmar(csv.charCodeAt(0) === 0xFEFF, 'sin BOM, Numbers abre los acentos rotos');
+    var lineas = csv.replace(/^﻿/, '').trim().split('\r\n');
+    igual(lineas.length, 4, 'cabecera más tres conceptos');
+    contiene(lineas[0], 'intermediacion');
+    contiene(lineas[1], 'edema');
+    igual(M.exportar.campoCsv('con, coma'), '"con, coma"');
+    igual(M.exportar.campoCsv('con "comillas"'), '"con ""comillas"""');
+  });
+
+  caso('exportar', 'el informe enlaza a los documentos para volver a ser indexado', function () {
+    var md = M.exportar.informeMd(capasDeMuestra(), resumenDeMuestra());
+    contiene(md, '# Estructura del archivo');
+    contiene(md, '[clinica/a.md](clinica/a.md)', 'los enlaces tienen que ser relativos y resolubles');
+    contiene(md, 'Modularidad');
+    contiene(md, '¿Qué relación hay entre edema y docencia?', 'las preguntas generadas van en el informe');
+    contiene(md, 'Puntos conectores');
+    contiene(md, 'Documentos aislados');
+    noContiene(md, 'undefined', 'plantilla del informe con un hueco sin rellenar');
+    noContiene(md, '[object', 'objeto sin formatear en el informe');
+  });
+
+  caso('exportar', 'el informe reindexado produce dependencias reales', function () {
+    // La prueba que cierra el círculo: se genera el informe, se pasa por el
+    // parser de markdown y se resuelven sus enlaces contra el propio corpus.
+    var capas = capasDeMuestra();
+    var md = M.exportar.informeMd(capas, resumenDeMuestra());
+    var enlaces = M.parsers.texto.extraerEnlaces(md);
+    var rutas = capas.documentos.nodos.map(function (n) { return n.ruta; });
+    var indice = M.grafo.documentos.indiceDeRutas(rutas);
+    var resueltos = enlaces.map(function (e) {
+      return M.grafo.documentos.resolver(e.destino, 'informe.md', indice).indice;
+    }).filter(function (i) { return i >= 0; });
+    afirmar(resueltos.length >= 2,
+      'el informe debe resolver al menos dos documentos del corpus, resolvió ' + resueltos.length);
+  });
+
+  caso('exportar', 'un grafo sin brechas ni resumen no revienta el informe', function () {
+    var capas = capasDeMuestra();
+    capas.brechas = null;
+    var md = M.exportar.informeMd(capas, null);
+    afirmar(md.length > 100);
+    contiene(md, 'Documentos |');
+    noContiene(md, 'undefined');
+  });
+
+  caso('exportar', 'la fecha del nombre de archivo es ordenable', function () {
+    igual(M.exportar.fecha(new Date('2026-03-07T12:00:00Z').getTime()).length, 10);
+    afirmar(/^\d{4}-\d{2}-\d{2}$/.test(M.exportar.fecha(Date.now())),
+      'el formato debe ordenar alfabéticamente igual que cronológicamente');
   });
 
   return { casos: casos, afirmar: afirmar, igual: igual, contiene: contiene, noContiene: noContiene };
