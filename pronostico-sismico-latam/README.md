@@ -58,7 +58,7 @@ motor numérico auditable a la espera de que alguien audite la ciencia.
 | 8 | Capa de lenguaje con verificación de cifras, revisor metodológico, paneles didácticos | ✅ |
 | + | **Fondo ETAS estimado conjuntamente** (decluster estocástico) e **informe HTML autocontenido** | ✅ |
 
-**412 pruebas, todas en verde** (402 rápidas + 10 lentas de recuperación y calibración).
+**392 pruebas, todas en verde** (382 rápidas + 10 lentas de recuperación y calibración).
 
 ### ⚠️ Advertencia sobre la Fase 1
 
