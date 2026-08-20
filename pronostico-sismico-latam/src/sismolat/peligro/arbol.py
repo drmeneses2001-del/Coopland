@@ -42,7 +42,34 @@ from typing import Any, Callable, Sequence
 
 import numpy as np
 
+import re
+
 from .psha import CurvaDePeligro, Sitio, curva_de_peligro
+
+
+def _colapsar_avisos(avisos: list[str]) -> tuple[str, ...]:
+    """Agrupa avisos que solo difieren en un valor numerico.
+
+    Un arbol de nueve hojas emite el mismo aviso nueve veces con distinto valor
+    de rama. La lista resultante es ruido, y una lista de advertencias que nadie
+    lee no advierte de nada. Aqui se conserva una por familia, anotando cuantas
+    variantes habia.
+    """
+    patron = re.compile(r"[-+]?\d+(?:[.,]\d+)?(?:[eE][-+]?\d+)?")
+    familias: dict[str, list[str]] = {}
+    for a in avisos:
+        familias.setdefault(patron.sub("#", a), []).append(a)
+    salida = []
+    for miembros in familias.values():
+        if len(miembros) == 1:
+            salida.append(miembros[0])
+        else:
+            valores = sorted({v for m in miembros for v in patron.findall(m)})
+            salida.append(
+                f"{miembros[0]}  [mismo aviso en {len(miembros)} ramas, con valores "
+                f"{', '.join(valores[:6])}]"
+            )
+    return tuple(salida)
 
 __all__ = ["Rama", "NodoLogico", "ArbolLogico", "ResultadoArbol", "peligro_con_arbol"]
 
@@ -220,5 +247,5 @@ def peligro_con_arbol(
     return ResultadoArbol(
         niveles=niveles, tasas=np.array(filas), pesos=np.array(pesos, dtype=float),
         etiquetas=tuple(etiquetas), sitio=sitio, medida=medida, arbol=arbol,
-        advertencias=tuple(dict.fromkeys(avisos)),
+        advertencias=_colapsar_avisos(list(dict.fromkeys(avisos))),
     )

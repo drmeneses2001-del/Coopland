@@ -125,12 +125,19 @@ def campo_suavizado(
     rejilla: Rejilla,
     *,
     ancho_km: float | np.ndarray,
+    pesos: np.ndarray | None = None,
     trozo: int = 500,
 ) -> np.ndarray:
-    """Campo espacial suavizado, en masa por celda (suma = numero de eventos).
+    """Campo espacial suavizado, en masa por celda (suma = suma de los pesos).
 
     ``ancho_km`` puede ser un escalar (ancho fijo) o un arreglo por evento
     (ancho adaptativo, ver :func:`anchos_adaptativos`).
+
+    ``pesos`` permite que cada evento aporte una masa distinta de 1. Lo usa el
+    decluster estocastico (:mod:`sismolat.modelos.decluster_estocastico`), donde
+    cada evento contribuye al mapa de fondo en proporcion a su **probabilidad de
+    ser un evento de fondo**, en lugar de contarse entero o descartarse entero.
+    Con ``pesos=None`` cada evento aporta 1 y la suma es el numero de eventos.
 
     Normalizacion por evento
     ------------------------
@@ -159,6 +166,12 @@ def campo_suavizado(
     if np.any(anchos <= 0):
         raise ValueError("todos los anchos deben ser positivos")
 
+    w = np.ones(n) if pesos is None else np.asarray(pesos, dtype=float)
+    if w.size != n:
+        raise ValueError(f"pesos tiene {w.size} valores para {n} eventos")
+    if np.any(w < 0):
+        raise ValueError("los pesos deben ser no negativos")
+
     campo = np.zeros(gx.size)
     for ini in range(0, n, trozo):
         fin = min(ini + trozo, n)
@@ -173,7 +186,7 @@ def campo_suavizado(
             k[vacio] = 0.0
             k[vacio, np.argmin(d[vacio], axis=1)] = 1.0
             suma[vacio, 0] = 1.0
-        campo += (k / suma).sum(axis=0)
+        campo += ((k / suma) * w[ini:fin, None]).sum(axis=0)
     return campo.reshape(nlon, nlat)
 
 

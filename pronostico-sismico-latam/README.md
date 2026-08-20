@@ -56,8 +56,9 @@ motor numérico auditable a la espera de que alguien audite la ciencia.
 | 6 | Dislocación elástica, transferencia de Coulomb, presupuesto geodésico de momento | ✅ |
 | 7 | Hipótesis exploratorias con preregistro, estadística circular, panel de resultado nulo | ✅ |
 | 8 | Capa de lenguaje con verificación de cifras, revisor metodológico, paneles didácticos | ✅ |
+| + | **Fondo ETAS estimado conjuntamente** (decluster estocástico) e **informe HTML autocontenido** | ✅ |
 
-**330 pruebas, todas en verde** (323 rápidas + 7 lentas de recuperación y calibración).
+**412 pruebas, todas en verde** (402 rápidas + 10 lentas de recuperación y calibración).
 
 ### ⚠️ Advertencia sobre la Fase 1
 
@@ -226,13 +227,40 @@ El revisor metodológico es **determinista**: fuga temporal, pruebas múltiples,
 parámetros no verificados y extrapolación los detecta el código. La capa de
 lenguaje solo los narra — y declara explícitamente lo que no cubre.
 
-### 9. Los paneles didácticos salen del código, y se auditan
+### 9. El fondo sísmico se estima, no se supone
+
+`ajustar_etas_espacial` supone fondo uniforme, y sobre un catálogo con fondo
+realmente heterogéneo ese supuesto **colapsa μ a cero**: el modelo no puede
+representar la estructura espacial del fondo y se la atribuye entera al disparo.
+
+`estimar_fondo_estocastico` la estima a la vez que los parámetros, asignando a
+cada evento una **probabilidad** de ser de fondo en vez de clasificarlo:
+
+| | μ (verdad 0.60) | K (0.018) | α (1.5) | d (6.0) | corr. del mapa |
+|---|---|---|---|---|---|
+| Fondo uniforme | **0.0008** | 0.0376 | 1.23 | 7.71 | 0.000 |
+| Fondo estimado | **0.704** | 0.0173 | 1.49 | 6.15 | **0.964** |
+
+### 10. Los paneles didácticos salen del código, y se auditan
 
 Cada módulo documenta en su docstring la matemática, los datos y **lo que no
 puede hacer**. `auditar_paneles()` recorre el paquete y lista los que no declaran
 sus límites; una prueba falla si aparece alguno. Hoy son **28 de 28**.
 
-### 10. Se declara lo que el software no puede garantizar
+### 11. El informe hace cumplir el contrato en la presentación
+
+`ejemplos/informe_completo.py` produce **un solo archivo HTML** que se abre sin
+servidor, sin red y sin instalar nada. No es un envoltorio neutro:
+
+- el aviso que niega predicción y alerta se escribe **siempre**, sin parámetro
+  que lo suprima;
+- `Informe.cantidad` recibe `Cantidad`, no `float` — **no puede** renderizar un
+  número sin su etiqueta de procedencia;
+- las advertencias van arriba de su sección, no al pie;
+- el panel de resultado nulo ocupa el mismo espacio que el positivo;
+- cada gráfico lleva su vista de tabla.
+
+### 12. Se declara lo que el software no puede garantizar
 
 `verificar_corte_temporal` detecta fuga **por marcas de tiempo** y lo dice: la
 fuga por selección de modelo tras haber visto el catálogo completo es indecidible
@@ -272,8 +300,13 @@ src/sismolat/
   sintetico.py          Generadores con parámetros conocidos (para las pruebas)
   ingesta/              fuentes · fdsn · dedup · homogenizacion · instantanea
   estadistica/          gutenberg_richter · mc · decluster
-  modelos/              omori · etas · suavizado
+  modelos/              omori · etas · suavizado · decluster_estocastico
   evaluacion/           pronostico · csep · alarma
+  peligro/              gmm · fuentes · psha · arbol · sitio
+  tectonica/            elastico · coulomb · momento
+  exploratorio/         circular · covariable · energia · panel
+  lenguaje/             verificacion · cliente · revisor · didactica
+  interfaz/             svg · informe
 parametros/             Coeficientes externalizados, todos marcados verificado = false
 docs/                   Contrato, fuentes, supuestos, pendientes, ADR
 ejemplos/               Canalización completa fases 0-4 sobre datos sintéticos

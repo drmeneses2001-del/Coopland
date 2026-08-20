@@ -61,7 +61,32 @@ __all__ = [
     "ParametrosETAS", "AjusteETAS", "intensidad_etas",
     "ajustar_etas", "simular_etas", "simular_espacio_temporal", "fondo_de_mezcla",
     "ParametrosEspaciales", "AjusteETASEspacial", "ajustar_etas_espacial",
+    "intensidad_en_eventos",
 ]
+
+
+def intensidad_en_eventos(
+    t: np.ndarray, m: np.ndarray, m0: float, mu: float, dens_fondo: np.ndarray,
+    temporales: "ParametrosETAS", espaciales: "ParametrosEspaciales",
+    pj: np.ndarray, pi: np.ndarray, pdt: np.ndarray, pr: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Intensidad total y aporte del fondo en cada evento.
+
+    Devuelve ``(lambda_total, lambda_fondo)``. Su cociente es la probabilidad de
+    que cada evento sea de fondo, que es el nucleo del decluster estocastico.
+    """
+    prod = temporales.K * np.exp(temporales.alpha * (m - m0))
+    D = espaciales.d_km ** 2 * np.exp(espaciales.gamma * (m - m0))
+    masa = 1.0 - (1.0 + espaciales.r_max_km ** 2 / D) ** (1.0 - espaciales.q)
+    Dp = D[pi]
+    dens = (((espaciales.q - 1.0) / (math.pi * Dp))
+            * (1.0 + pr ** 2 / Dp) ** (-espaciales.q) / masa[pi])
+    aporte = prod[pi] * np.power(pdt + temporales.c, -temporales.p) * dens
+
+    lam_fondo = mu * np.asarray(dens_fondo, dtype=float)
+    lam = lam_fondo.copy()
+    np.add.at(lam, pj, aporte)
+    return lam, lam_fondo
 
 
 def fondo_de_mezcla(
@@ -690,11 +715,18 @@ def _desempaquetar(x: np.ndarray) -> dict[str, float]:
 
 
 def _mll_espacial(
-    x: np.ndarray, t: np.ndarray, m: np.ndarray, m0: float, area_km2: float,
+    x: np.ndarray, t: np.ndarray, m: np.ndarray, m0: float, dens_fondo: np.ndarray,
     t_ini: float, t_fin: float, pj: np.ndarray, pi: np.ndarray,
     pdt: np.ndarray, pr: np.ndarray, r_max_km: float,
 ) -> float:
-    """-log L de ETAS espacio-temporal con nucleo truncado."""
+    """-log L de ETAS espacio-temporal con nucleo truncado.
+
+    ``dens_fondo`` es la densidad espacial de fondo **normalizada** evaluada en
+    cada evento, en 1/km2, de modo que integra a 1 sobre la region. Con fondo
+    uniforme vale ``1/area`` en todos los eventos; con fondo estimado por
+    decluster estocastico varia de un evento a otro. En ambos casos ``mu`` es la
+    tasa TOTAL de fondo en eventos/dia, asi que el termino integral no cambia.
+    """
     v = _desempaquetar(x)
     mu, K, alpha, c, p = v["mu"], v["K"], v["alpha"], v["c"], v["p"]
     d_km, q, gamma = v["d_km"], v["q"], v["gamma"]
@@ -715,7 +747,7 @@ def _mll_espacial(
     dens = ((q - 1.0) / (math.pi * Dp)) * (1.0 + pr ** 2 / Dp) ** (-q) / masa[pi]
     aporte = prod[pi] * np.power(pdt + c, -p) * dens
 
-    lam = np.full(t.size, mu / area_km2, dtype=float)
+    lam = mu * np.asarray(dens_fondo, dtype=float)
     np.add.at(lam, pj, aporte)
     sel = t >= t_ini
     if not sel.any():
@@ -834,10 +866,12 @@ def ajustar_etas_espacial(
     libres = [k for k in _NOMBRES_ESPACIAL if k not in fijos]
     idx_libres = [_NOMBRES_ESPACIAL.index(k) for k in libres]
 
+    dens_uniforme = np.full(t.size, 1.0 / area_km2)
+
     def objetivo(v_libres: np.ndarray, activos: list[int]) -> float:
         completo = _empaquetar(partida).copy()
         completo[activos] = v_libres
-        return _mll_espacial(completo, t, m, m0, area_km2, float(t_inicio_ajuste),
+        return _mll_espacial(completo, t, m, m0, dens_uniforme, float(t_inicio_ajuste),
                              t_fin, pj, pi, pdt, pr, r_max_km)
 
     def optimizar(nombres: list[str], iteraciones: int) -> None:
