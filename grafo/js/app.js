@@ -17,6 +17,7 @@
     trabajando: false,
     grafista: null,
     resumenGrafo: null,
+    capas: null,
     comunidadPorNodo: null,
     huerfanos: null,
     umbralAfinidad: 0.12,
@@ -77,8 +78,10 @@
       estado.resumenGrafo = r.resumen;
       await GC.almacen.config('resumenGrafo', r.resumen);
       await cargarDetalleGrafo();
-      pintarGrafo();
+      // La instantánea se guarda ANTES de pintar: el deslizador temporal lee
+      // el historial al montarse, y si se guardaba después arrancaba vacío.
       await guardarInstantaneaDeGrafo(r.instantanea);
+      await pintarGrafo();
       $('grafo-estado').textContent = 'al día';
       decir('grafo al día · ' + F.numero(r.resumen.conceptos.nodos) + ' conceptos, ' +
             F.numero(r.resumen.conceptos.comunidades) + ' comunidades, Q = ' +
@@ -98,6 +101,7 @@
   // comunidad de cada nodo y los huérfanos se leen del registro guardado.
   async function cargarDetalleGrafo() {
     var capas = await GC.almacen.leer('grafo', 'capas');
+    estado.capas = capas || null;
     if (!capas) { estado.comunidadPorNodo = null; estado.huerfanos = null; return; }
     estado.comunidadPorNodo = capas.conceptos.comunidad;
     var porId = new Map();
@@ -105,7 +109,7 @@
     estado.huerfanos = (capas.mixta.huerfanos || []).map(function (id) { return porId.get(id); }).filter(Boolean);
   }
 
-  function pintarGrafo() {
+  async function pintarGrafo() {
     if (!estado.resumenGrafo) return;
     V.mostrar('bloque-grafo', true);
     $('grafo-contenido').hidden = false;
@@ -115,8 +119,11 @@
       umbral: estado.umbralAfinidad,
       huerfanos: estado.huerfanos
     });
-    VG.capaVisible(estado.capaActiva);
     $('umbral-afinidad').value = String(estado.umbralAfinidad);
+
+    // El lienzo necesita los arreglos completos, que viven en IndexedDB y no
+    // viajan en el resumen: por eso se leen aquí y no llegan por mensaje.
+    if (estado.capas) await GC.ui.mapa.montar(estado.capas, estado.resumenGrafo);
   }
 
   // La instantánea de la apertura ya existía desde la Fase 2 con el campo
@@ -131,7 +138,6 @@
     } else {
       await GC.indexador.guardarInstantanea(estado.indice, { grafo: instantanea, version: 'fase3' });
     }
-    refrescarHistorial();
   }
 
   async function aplicarVacias() {
@@ -162,14 +168,7 @@
     V.mostrar('bloque-grafo', estado.indice.docs.length > 0);
 
     V.barra(est, (est.porEstado.error || 0), estado.arranqueMs, duracionMs != null ? duracionMs : estado.ultimaDuracion);
-    refrescarHistorial();
     refrescarEspacio();
-  }
-
-  async function refrescarHistorial() {
-    var lista = await GC.almacen.listarInstantaneas();
-    V.mostrar('bloque-historial', lista.length > 0);
-    if (lista.length) V.historial(lista);
   }
 
   async function refrescarEspacio() {
@@ -395,7 +394,7 @@
 
     estado.arranqueMs = performance.now() - t0;
     repintar(null, null);
-    if (estado.resumenGrafo) pintarGrafo();
+    if (estado.resumenGrafo) await pintarGrafo();
     decir(estado.indice.docs.length
       ? 'índice reconstruido en ' + F.duracion(estado.arranqueMs)
       : 'sin índice todavía');
@@ -445,16 +444,6 @@
     if (!caja) return;
     caja.hidden = !caja.hidden;
     b.textContent = caja.hidden ? 'Tender el puente' : 'Ocultar la pregunta';
-  });
-  $('conmutador-capas').addEventListener('click', function (ev) {
-    var b = ev.target.closest('button[data-capa]');
-    if (!b) return;
-    estado.capaActiva = b.dataset.capa;
-    VG.capaVisible(estado.capaActiva);
-  });
-  $('umbral-afinidad').addEventListener('input', function () {
-    estado.umbralAfinidad = parseFloat(this.value);
-    if (estado.resumenGrafo) VG.afinidades(estado.resumenGrafo.documentos.afinidades, estado.umbralAfinidad);
   });
   $('btn-verificar-b').addEventListener('click', verificarB);
   $('btn-reset-verif').addEventListener('click', async function () {

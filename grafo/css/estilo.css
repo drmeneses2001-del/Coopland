@@ -40,6 +40,12 @@
 
 * { box-sizing: border-box; }
 
+html {
+  /* La cabecera es fija: sin este margen, cualquier salto a un control lo deja
+     justo debajo de ella y el dedo toca la cabecera en su lugar. */
+  scroll-padding-top: 72px;
+}
+
 html, body {
   margin: 0; padding: 0;
   background: var(--fondo);
@@ -281,3 +287,174 @@ details.plegable > div { padding: 0 12px 12px; }
 .grupo-brechas > h3 { font-size: 13px; font-weight: 600; margin: 22px 0 2px; display: flex; align-items: center; gap: 8px; }
 .grupo-brechas > h3 .cuenta { font-family: var(--mono); font-size: 11.5px; color: var(--texto-tenue); font-weight: 400; }
 .grupo-brechas > p.nota { margin-top: 4px; }
+
+/* --- Fase 5: el lienzo ---------------------------------------------------- */
+
+/* El lienzo manda: ocupa casi toda la altura útil y el panel se le acopla al
+   lado. En vertical el panel pasa debajo, porque un panel de 300 px sobre un
+   iPad en retrato deja el grafo en una ranura. */
+.mapa {
+  /* Posicionado: el botón de plegado se ancla a esta caja. Sin `relative` se
+     anclaba al viewport, quedaba fuera del mapa y `overflow:hidden` lo
+     recortaba: existía en el DOM y no había forma de tocarlo. */
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1px;
+  background: var(--linea);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio);
+  overflow: hidden;
+  margin-top: 12px;
+}
+.mapa.panel-plegado { grid-template-columns: 1fr 0; }
+
+/* La altura la fija el mapa, no su contenido. Sin esto el panel lateral —que
+   es tan alto como sus tablas— estiraba la fila y el lienzo crecía hasta el
+   doble de la pantalla, con la mitad fuera del alcance del dedo. */
+.mapa { height: min(70vh, 760px); }
+.mapa > * { min-height: 0; min-width: 0; }
+
+.mapa-lienzo { position: relative; background: var(--fondo); height: 100%; }
+.mapa-lienzo canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+/* Lectura de instrumento: cifras vivas en monoespaciada, sin caja ni sombra. */
+.hud {
+  position: absolute; top: 8px; left: 10px; pointer-events: none;
+  font-family: var(--mono); font-size: 10.5px; line-height: 1.5;
+  color: var(--texto-tenue); white-space: pre;
+}
+.aviso-lienzo {
+  position: absolute; left: 10px; bottom: 10px; right: 10px;
+  font-family: var(--mono); font-size: 11px; color: var(--aviso);
+  pointer-events: none;
+}
+
+/* Ficha del nodo: aparece sobre el lienzo, anclada abajo a la derecha para no
+   taparlo con el pulgar. */
+/* La ficha se apoya sobre el deslizador temporal, no debajo: con `bottom:10px`
+   sus botones quedaban tapados por la línea de tiempo y no había forma de
+   pulsar «Abrir documento». */
+.mapa-lienzo.con-tiempo .ficha-nodo { bottom: 84px; }
+.ficha-nodo {
+  position: absolute; right: 10px; bottom: 10px; max-width: 300px; z-index: 5;
+  background: var(--fondo-alto); border: 1px solid var(--linea-fuerte);
+  border-radius: var(--radio); padding: 10px 12px;
+}
+.ficha-nodo h4 { margin: 0 0 6px; font-size: 14px; display: flex; align-items: center; gap: 7px; }
+.ficha-nodo .chip { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 10px; }
+.ficha-nodo dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+.ficha-nodo dt { color: var(--texto-tenue); }
+.ficha-nodo dd { margin: 0; font-family: var(--mono); text-align: right; }
+.ficha-nodo .acciones { margin-top: 8px; }
+.ficha-nodo .acciones button { min-height: 34px; font-size: 12px; padding: 0 8px; }
+
+.menu-contextual {
+  position: absolute; z-index: 5; min-width: 210px;
+  background: var(--fondo-alto); border: 1px solid var(--linea-fuerte); border-radius: var(--radio);
+  overflow: hidden;
+}
+.menu-contextual button {
+  display: block; width: 100%; text-align: left; border: 0; border-radius: 0;
+  border-bottom: 1px solid var(--linea); background: transparent;
+  min-height: var(--tacto); padding: 0 12px; font-size: 13.5px;
+}
+.menu-contextual button:last-child { border-bottom: 0; }
+.menu-contextual button:active { background: var(--fondo-hundido); }
+
+/* Panel lateral plegable. */
+.panel-lateral { background: var(--fondo); display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; }
+.mapa.panel-plegado .panel-lateral { display: none; }
+.panel-lateral .conmutador { margin: 0; border: 0; border-bottom: 1px solid var(--linea); border-radius: 0; }
+.panel-lateral .conmutador button { font-size: 11.5px; padding: 0 4px; letter-spacing: 0; }
+.panel-cuerpo { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 12px 16px; flex: 1; min-height: 0; }
+.panel-cuerpo .bloque { margin-top: 18px; }
+.panel-cuerpo .cifras { grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); }
+.panel-cuerpo .cifra b { font-size: 17px; }
+.pestana[hidden] { display: none; }
+
+/* Barra de controles del mapa. Se desplaza en horizontal antes que apilarse:
+   en un iPad, envolver esto en tres filas se come el lienzo. */
+.barra-mapa {
+  display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding: 10px 2px; margin-top: 2px;
+}
+.barra-mapa input[type="search"] { flex: 0 0 190px; min-height: 40px; margin: 0; }
+.barra-mapa .conmutador { margin: 0; flex: 0 0 auto; }
+.barra-mapa .conmutador.compacto button { min-height: 40px; font-size: 12px; padding: 0 10px; }
+.barra-mapa button.menor { min-height: 40px; flex: 0 0 auto; }
+.control-linea {
+  display: flex; align-items: center; gap: 6px; flex: 0 0 auto;
+  font-family: var(--mono); font-size: 11px; color: var(--texto-tenue); white-space: nowrap;
+}
+.control-linea input[type="range"] { width: 110px; min-height: 40px; }
+.control-linea select {
+  font-family: var(--mono); font-size: 12px; min-height: 40px;
+  background: var(--fondo-hundido); color: var(--texto);
+  border: 1px solid var(--linea); border-radius: var(--radio); padding: 0 6px;
+}
+input[type="range"] { accent-color: var(--activo); }
+
+/* Deslizador temporal: el elemento característico. Va pegado al borde inferior
+   del lienzo y muestra las instantáneas como marcas reales, no como una regla
+   decorativa. */
+/* Va sobre el lienzo, pegado a su borde inferior: es donde la especificación
+   lo quiere y, de paso, queda fuera del alcance de la cabecera fija. */
+.tiempo {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+  background: color-mix(in oklch, var(--fondo) 88%, transparent);
+  border-top: 1px solid var(--linea);
+  padding: 6px 12px 8px;
+}
+.tiempo[hidden] { display: none; }
+.tiempo input[type="range"] { width: 100%; min-height: 34px; display: block; }
+.tiempo-pie {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 11px; color: var(--texto-medio);
+  white-space: nowrap; overflow: hidden;
+}
+.tiempo-pie #tiempo-marca-inicio { color: var(--texto-tenue); flex: 0 0 auto; }
+.tiempo-pie #tiempo-etiqueta { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.tiempo-pie button { flex: 0 0 auto; min-height: 32px; }
+
+/* Visor de documento: panel deslizante desde la derecha. Aquí es donde la
+   trazabilidad deja de ser una promesa. */
+.visor {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 92vw); z-index: 40;
+  background: var(--fondo-alto); border-left: 1px solid var(--linea-fuerte);
+  display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+}
+.visor[hidden] { display: none; }
+.visor-cabeza { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--linea); }
+.visor-titulo { font-family: var(--mono); font-size: 12px; color: var(--texto-medio); word-break: break-all; flex: 1; }
+.visor-cuerpo { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px; flex: 1; }
+.texto-documento { font-size: 15px; line-height: 1.65; margin-top: 12px; }
+.oracion { border-radius: 2px; }
+/* El subrayado va por debajo del texto, no como fondo de color: resaltar con
+   relleno convierte el documento en un marcador fluorescente y deja de leerse. */
+.oracion.resaltada {
+  box-shadow: inset 0 -2px 0 var(--activo);
+  background: color-mix(in oklch, var(--activo) 10%, transparent);
+}
+
+@media (max-width: 900px) {
+  .mapa { grid-template-columns: 1fr; grid-template-rows: 52vh 40vh; height: auto; }
+  .mapa.panel-plegado { grid-template-columns: 1fr; grid-template-rows: 52vh; }
+  .panel-lateral { border-top: 1px solid var(--linea); }
+}
+
+/* Plegar el panel: en el iPad en horizontal, 340 px de panel son la diferencia
+   entre ver el grafo y ver una franja de grafo. */
+/* Tirador en el borde derecho del lienzo. Estuvo arriba a la derecha del mapa
+   y tapaba la última pestaña del panel: un control que inutiliza otro control. */
+.plegar-panel {
+  position: absolute; top: 50%; right: 0; transform: translateY(-50%); z-index: 6;
+  width: 22px; min-height: 56px; padding: 0;
+  border-radius: var(--radio) 0 0 var(--radio);
+  font-family: var(--mono); font-size: 14px; line-height: 1;
+  background: var(--fondo-alto); border: 1px solid var(--linea-fuerte); border-radius: var(--radio);
+  color: var(--texto-medio);
+}
+.mapa.panel-plegado .plegar-panel { transform: translateY(-50%) rotate(180deg); }

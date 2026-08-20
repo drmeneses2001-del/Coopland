@@ -103,13 +103,6 @@
   </section>
 
   <!-- ---------------------------------------------------------------- -->
-  <section class="bloque" id="bloque-historial" hidden>
-    <h2>Instantáneas <span class="cuenta" id="historial-cuenta"></span></h2>
-    <p class="nota">Cada apertura deja un estado guardado. Es el material del deslizador temporal de la Fase 5.</p>
-    <div class="desplaza"><table class="datos" id="tabla-historial"></table></div>
-  </section>
-
-  <!-- ---------------------------------------------------------------- -->
   <section class="bloque" id="bloque-grafo" hidden>
     <h2>Grafo <span class="cuenta" id="grafo-fecha"></span></h2>
 
@@ -124,114 +117,50 @@
     </div>
 
     <div id="grafo-contenido" hidden>
-      <div class="cifras" id="cifras-grafo" style="margin-top:12px"></div>
-      <div class="aviso-corte" id="grafo-corte"></div>
 
-      <div class="conmutador" id="conmutador-capas" role="tablist" style="margin-top:16px">
-        <button role="tab" aria-selected="true" data-capa="conceptos">Conceptos</button>
-        <button role="tab" aria-selected="false" data-capa="documentos">Documentos</button>
-        <button role="tab" aria-selected="false" data-capa="mixta">Mixta</button>
-        <button role="tab" aria-selected="false" data-capa="brechas">Brechas</button>
-      </div>
-
-      <!-- capa de conceptos -->
-      <div class="capa" id="capa-conceptos">
-        <div class="diversidad" id="medidor-diversidad"></div>
-
-        <section class="bloque">
-          <h2>Temas <span class="cuenta" id="temas-cuenta"></span></h2>
-          <div class="barra-reparto" id="reparto-comunidades"></div>
-          <div id="lista-comunidades"></div>
-        </section>
-
-        <section class="bloque">
-          <h2>Conceptos más influyentes</h2>
-          <p class="nota">
-            Ordenados por intermediación (betweenness): en cuántos caminos mínimos
-            entre otros dos conceptos aparece cada uno. Es lo que determina el
-            tamaño del nodo en el lienzo.
-          </p>
-          <div class="tabla-alta desplaza"><table class="datos" id="tabla-influyentes"></table></div>
-        </section>
-
-        <section class="bloque">
-          <h2>Puntos conectores del discurso</h2>
-          <p class="nota">
-            Conceptos con intermediación alta en relación con lo poco que se
-            repiten: unen territorios sin ser protagonistas. Suelen ser lo más
-            interesante del grafo, y son invisibles para cualquier recuento de
-            frecuencia.
-          </p>
-          <div class="tabla-alta desplaza"><table class="datos" id="tabla-conectores"></table></div>
-        </section>
-      </div>
-
-      <!-- capa de documentos -->
-      <div class="capa" id="capa-documentos" hidden>
-        <div class="cifras" id="cifras-documentos"></div>
-
-        <section class="bloque">
-          <h2>Dependencias explícitas <span class="cuenta" id="dependencias-cuenta"></span></h2>
-          <p class="nota">
-            Alguien escribió estos enlaces: wikilinks, enlaces relativos, rutas
-            citadas, referencias bibliográficas repetidas y secuencias de versión.
-            Son hechos, no estadística — por eso se dibujan con línea sólida.
-          </p>
-          <div class="acciones" style="margin:0 0 8px">
-            <span class="arista-tipo enlace">enlace</span>
-            <span class="arista-tipo referencia">referencia compartida</span>
-            <span class="arista-tipo version">versión</span>
+      <!-- ============================ el lienzo ============================ -->
+      <div class="mapa" id="mapa">
+        <div class="mapa-lienzo">
+          <canvas id="lienzo"></canvas>
+          <div class="hud" id="hud"></div>
+          <div class="aviso-lienzo" id="aviso-lienzo" hidden></div>
+          <div class="ficha-nodo" id="ficha-nodo" hidden></div>
+          <div class="menu-contextual" id="menu-contextual" hidden></div>
+          <button class="plegar-panel" id="btn-plegar-panel" aria-expanded="true"
+                  title="Plegar el panel">&rsaquo;</button>
+          <div class="tiempo" id="tiempo" hidden>
+            <input type="range" id="deslizador-tiempo" min="0" max="0" step="1" value="0">
+            <div class="tiempo-pie">
+              <span id="tiempo-marca-inicio"></span>
+              <span id="tiempo-etiqueta">estado actual</span>
+              <button class="menor" id="btn-tiempo-actual">Presente</button>
+            </div>
           </div>
-          <div class="tabla-alta desplaza"><table class="datos" id="tabla-dependencias"></table></div>
-        </section>
+        </div>
 
-        <section class="bloque">
-          <h2>Afinidad semántica <span class="cuenta" id="afinidades-cuenta"></span></h2>
-          <p class="nota">
-            Coseno TF-IDF entre documentos: dos textos que comparten vocabulario
-            poco común. Es una estadística, no una decisión de quien escribió —
-            por eso va con línea punteada y umbral ajustable.
-          </p>
-          <label class="campo" for="umbral-afinidad">Umbral de coseno · <span id="umbral-valor">0.12</span></label>
-          <input type="range" id="umbral-afinidad" min="0.05" max="0.9" step="0.01" value="0.12" style="width:100%;min-height:44px">
-          <div class="tabla-alta desplaza"><table class="datos" id="tabla-afinidades"></table></div>
-        </section>
+        <aside class="panel-lateral" id="panel-lateral">
+          <div class="conmutador" id="panel-pestanas" role="tablist">
+            <button role="tab" data-pestana="temas" aria-selected="true">Temas</button>
+            <button role="tab" data-pestana="brechas" aria-selected="false">Brechas</button>
+            <button role="tab" data-pestana="relaciones" aria-selected="false">Relaciones</button>
+            <button role="tab" data-pestana="estructura" aria-selected="false">Estructura</button>
+            <button role="tab" data-pestana="evolucion" aria-selected="false">Evolución</button>
+          </div>
 
-        <section class="bloque">
-          <h2>Documentos aislados <span class="cuenta" id="aislados-cuenta"></span></h2>
-          <p class="nota">
-            Ricos en contenido, sin ninguna dependencia explícita. Es la firma
-            estructural del texto que escribiste y nunca volviste a conectar con
-            nada. La Fase 4 los convertirá en preguntas.
-          </p>
-          <div class="desplaza"><table class="datos" id="tabla-aislados"></table></div>
-        </section>
+          <div class="panel-cuerpo">
+            <div class="pestana" data-pestana="temas">
+<div class="diversidad" id="medidor-diversidad"></div>
 
-        <section class="bloque">
-          <h2>Enlaces sin destino <span class="cuenta" id="sinresolver-cuenta"></span></h2>
-          <p class="nota">Enlaces escritos que no apuntan a ningún documento del índice. No se inventa el destino: se listan.</p>
-          <div class="tabla-alta desplaza"><table class="datos" id="tabla-sinresolver"></table></div>
-        </section>
-      </div>
+        
+              <section class="bloque">
+                <h2>Temas <span class="cuenta" id="temas-cuenta"></span></h2>
+                <div class="barra-reparto" id="reparto-comunidades"></div>
+                <div id="lista-comunidades"></div>
+              </section>
+            </div>
 
-      <!-- capa mixta -->
-      <div class="capa" id="capa-mixta" hidden>
-        <div class="cifras" id="cifras-mixta"></div>
-        <p class="nota" style="margin-top:12px">
-          Documentos y conceptos en el mismo lienzo, unidos por aristas de
-          pertenencia. Los índices inversos ya están calculados y guardados: son
-          los que harán instantáneo, en la Fase 5, iluminar los documentos de un
-          concepto o desplegar el subgrafo de un documento.
-        </p>
-        <section class="bloque">
-          <h2>Documentos sin ningún concepto <span class="cuenta" id="huerfanos-cuenta"></span></h2>
-          <div class="desplaza"><table class="datos" id="tabla-huerfanos"></table></div>
-        </section>
-      </div>
-
-      <!-- brechas -->
-      <div class="capa" id="capa-brechas" hidden>
-        <div class="cifras" id="cifras-brechas"></div>
+            <div class="pestana" data-pestana="brechas" hidden>
+              <div class="cifras" id="cifras-brechas"></div>
         <p class="nota" style="margin-top:12px">
           Una brecha no es «dos cosas que no se tocan»: en un grafo grande eso son
           millones de pares y ninguno significa nada. Aquí una brecha es una
@@ -273,7 +202,130 @@
           <summary>Cómo se calcularon</summary>
           <div class="desplaza"><table class="datos" id="tabla-parametros-brechas"></table></div>
         </details>
+
+            </div>
+
+            <div class="pestana" data-pestana="relaciones" hidden>
+              <div class="cifras" id="cifras-documentos"></div>
+
+        <section class="bloque">
+          <h2>Dependencias explícitas <span class="cuenta" id="dependencias-cuenta"></span></h2>
+          <p class="nota">
+            Alguien escribió estos enlaces: wikilinks, enlaces relativos, rutas
+            citadas, referencias bibliográficas repetidas y secuencias de versión.
+            Son hechos, no estadística — por eso se dibujan con línea sólida.
+          </p>
+          <div class="acciones" style="margin:0 0 8px">
+            <span class="arista-tipo enlace">enlace</span>
+            <span class="arista-tipo referencia">referencia compartida</span>
+            <span class="arista-tipo version">versión</span>
+          </div>
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-dependencias"></table></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Afinidad semántica <span class="cuenta" id="afinidades-cuenta"></span></h2>
+          <p class="nota">
+            Coseno TF-IDF entre documentos: dos textos que comparten vocabulario
+            poco común. Es una estadística, no una decisión de quien escribió —
+            por eso va con línea punteada y umbral ajustable.
+          </p>
+          <p class="pendiente">El umbral se ajusta en la barra de abajo, bajo el lienzo.</p>
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-afinidades"></table></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Documentos aislados <span class="cuenta" id="aislados-cuenta"></span></h2>
+          <p class="nota">
+            Ricos en contenido, sin ninguna dependencia explícita. Es la firma
+            estructural del texto que escribiste y nunca volviste a conectar con
+            nada. La Fase 4 los convertirá en preguntas.
+          </p>
+          <div class="desplaza"><table class="datos" id="tabla-aislados"></table></div>
+        </section>
+
+        <section class="bloque">
+          <h2>Enlaces sin destino <span class="cuenta" id="sinresolver-cuenta"></span></h2>
+          <p class="nota">Enlaces escritos que no apuntan a ningún documento del índice. No se inventa el destino: se listan.</p>
+          <div class="tabla-alta desplaza"><table class="datos" id="tabla-sinresolver"></table></div>
+        </section>
+
+            </div>
+
+            <div class="pestana" data-pestana="estructura" hidden>
+              <div class="cifras" id="cifras-grafo"></div>
+              <div class="aviso-corte" id="grafo-corte"></div>
+              <section class="bloque">
+                <h2>Conceptos más influyentes</h2>
+                <p class="nota">
+                  Ordenados por intermediación (betweenness): en cuántos caminos
+                  mínimos entre otros dos conceptos aparece cada uno. Es lo que
+                  determina el tamaño del nodo en el lienzo.
+                </p>
+                <div class="tabla-alta desplaza"><table class="datos" id="tabla-influyentes"></table></div>
+              </section>
+              <section class="bloque">
+                <h2>Puntos conectores del discurso</h2>
+                <p class="nota">
+                  Intermediación alta en relación con lo poco que se repiten: unen
+                  territorios sin ser protagonistas. Son invisibles para cualquier
+                  recuento de frecuencia.
+                </p>
+                <div class="tabla-alta desplaza"><table class="datos" id="tabla-conectores"></table></div>
+              </section>
+              <section class="bloque">
+                <h2>Capa mixta</h2>
+                <div class="cifras" id="cifras-mixta"></div>
+        <p class="nota" style="margin-top:12px">
+          Documentos y conceptos en el mismo lienzo, unidos por aristas de
+          pertenencia. Los índices inversos ya están calculados y guardados: son
+          los que harán instantáneo, en la Fase 5, iluminar los documentos de un
+          concepto o desplegar el subgrafo de un documento.
+        </p>
+        <section class="bloque">
+          <h2>Documentos sin ningún concepto <span class="cuenta" id="huerfanos-cuenta"></span></h2>
+          <div class="desplaza"><table class="datos" id="tabla-huerfanos"></table></div>
+        </section>
+
+              </section>
+            </div>
+
+            <div class="pestana" data-pestana="evolucion" hidden>
+              <p class="nota">
+                Cada construcción del grafo deja una instantánea. El deslizador de
+                abajo recorre esos estados: ver crecer el propio pensamiento es la
+                razón de ser de esta aplicación.
+              </p>
+              <div class="cifras" id="cifras-evolucion"></div>
+              <div class="desplaza"><table class="datos" id="tabla-historial"></table></div>
+            </div>
+          </div>
+        </aside>
       </div>
+
+      <!-- ============================ controles ============================ -->
+      <div class="barra-mapa">
+        <input type="search" id="busqueda" placeholder="Buscar concepto o documento"
+               autocapitalize="off" autocorrect="off" spellcheck="false">
+        <div class="conmutador compacto" id="conmutador-capas" role="tablist">
+          <button role="tab" aria-selected="true" data-capa="conceptos">Conceptos</button>
+          <button role="tab" aria-selected="false" data-capa="documentos">Documentos</button>
+          <button role="tab" aria-selected="false" data-capa="mixta">Mixta</button>
+        </div>
+        <button class="menor" id="btn-dimension" aria-pressed="false">2D</button>
+        <label class="control-linea">afinidad <span id="umbral-valor">0.12</span>
+          <input type="range" id="umbral-afinidad" min="0.05" max="0.9" step="0.01" value="0.12">
+        </label>
+        <label class="control-linea">tipo
+          <select id="filtro-tipo"><option value="">todos</option></select>
+        </label>
+        <label class="control-linea">desde <span id="fecha-valor">todo</span>
+          <input type="range" id="filtro-fecha" min="0" max="100" step="1" value="0">
+        </label>
+        <button class="menor" id="btn-encuadrar">Encuadrar</button>
+        <button class="menor" id="btn-ruta">Ruta de lectura</button>
+      </div>
+
     </div>
   </section>
 
@@ -320,6 +372,14 @@
 
 </div>
 
+<div class="visor" id="visor" hidden>
+  <div class="visor-cabeza">
+    <span class="visor-titulo" id="visor-titulo"></span>
+    <button class="menor" id="btn-cerrar-visor">Cerrar</button>
+  </div>
+  <div class="visor-cuerpo" id="visor-cuerpo"></div>
+</div>
+
 <div class="barra-inferior" id="barra-inferior">
   <span>docs <b id="bi-docs">—</b></span><span class="sep">│</span>
   <span>conceptos <b id="bi-conceptos">—</b></span><span class="sep">│</span>
@@ -351,10 +411,16 @@
 <script src="js/grafo/mixta.js"></script>
 <script src="js/grafo/brechas.js"></script>
 <script src="js/grafo/preguntas.js"></script>
+<script src="js/grafo/ruta.js"></script>
 <script src="js/ui/formato.js"></script>
 <script src="js/ui/colores.js"></script>
+<script src="js/lienzo/camara.js"></script>
+<script src="js/lienzo/lienzo.js"></script>
+<script src="js/lienzo/gestos.js"></script>
 <script src="js/ui/vistas.js"></script>
 <script src="js/ui/vistas-grafo.js"></script>
+<script src="js/ui/visor.js"></script>
+<script src="js/ui/mapa.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

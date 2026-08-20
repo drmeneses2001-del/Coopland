@@ -202,21 +202,6 @@
     }).join('') || '<div class="vacio">Sin vocabulario todavía.</div>';
   }
 
-  // --- historial -----------------------------------------------------------
-  function historial(instantaneas) {
-    $('historial-cuenta').textContent = F.numero(instantaneas.length);
-    var orden = instantaneas.slice().reverse().slice(0, 30);
-    $('tabla-historial').innerHTML =
-      '<thead><tr><th>Fecha</th><th>Documentos</th><th>Conceptos</th><th>Palabras</th><th>Versión</th></tr></thead><tbody>' +
-      orden.map(function (i) {
-        return '<tr><td class="ruta">' + esc(F.fecha(i.fecha)) + '</td>' +
-          '<td class="num">' + F.numero(i.documentos) + '</td>' +
-          '<td class="num">' + F.numero(i.conceptos) + '</td>' +
-          '<td class="num">' + F.numero(i.palabras) + '</td>' +
-          '<td class="ruta">' + esc(i.version) + '</td></tr>';
-      }).join('') + '</tbody>';
-  }
-
   // --- barra inferior ------------------------------------------------------
   function barra(est, nErrores, arranqueMs, duracionMs) {
     document.getElementById('bi-docs').textContent = F.numero(est.documentos);
@@ -230,6 +215,6 @@
   return {
     mostrar: mostrar, rutas: rutas, entorno: entorno, progreso: progreso, cifras: cifras,
     cambios: cambios, errores: errores, inventario: inventario, conceptos: conceptos,
-    historial: historial, barra: barra
+    barra: barra
   };
 });

@@ -16,9 +16,11 @@
         documentos: require('../js/grafo/documentos.js'),
         mixta: require('../js/grafo/mixta.js'),
         brechas: require('../js/grafo/brechas.js'),
-        preguntas: require('../js/grafo/preguntas.js')
+        preguntas: require('../js/grafo/preguntas.js'),
+        ruta: require('../js/grafo/ruta.js')
       },
       colores: require('../js/ui/colores.js'),
+      camara: require('../js/lienzo/camara.js'),
       parsers: {
         texto: require('../js/parsers/texto.js'),
         rtf: require('../js/parsers/rtf.js'),
@@ -34,7 +36,8 @@
       hash: raiz.GC.hash, bytes: raiz.GC.bytes, vacias: raiz.GC.vacias,
       terminos: raiz.GC.terminos, diff: raiz.GC.diff, indice: raiz.GC.indice,
       registro: raiz.GC.registro, parsers: raiz.GC.parsers,
-      grafo: raiz.GC.grafo, colores: raiz.GC.ui.colores
+      grafo: raiz.GC.grafo, colores: raiz.GC.ui.colores,
+      camara: raiz.GC.lienzo ? raiz.GC.lienzo.camara : null
     };
   }
   var api = fabrica(mods);
@@ -950,6 +953,117 @@
         afirmar(carga.length < 600, 'la carga debe ser una lista de términos, no un documento');
       });
     });
+  });
+
+
+  // =========================== Fase 5: el lienzo ============================
+
+  caso('lienzo: cámara', 'la ida y vuelta entre mundo y pantalla es exacta', function () {
+    var c = M.camara.crear({ ancho: 800, alto: 600 });
+    c.zoom(1.7, 400, 300);
+    c.desplazar(37, -12);
+    [[0, 0], [50, -30], [-1200, 940]].forEach(function (p) {
+      var pantalla = c.proyectar(p[0], p[1], 0);
+      var vuelta = c.aMundo(pantalla.x, pantalla.y);
+      afirmar(Math.abs(vuelta.x - p[0]) < 1e-6 && Math.abs(vuelta.y - p[1]) < 1e-6,
+        'no vuelve al mismo punto: ' + JSON.stringify(vuelta) + ' vs ' + JSON.stringify(p));
+    });
+  });
+
+  caso('lienzo: cámara', 'el punto del pellizco se queda quieto bajo el dedo', function () {
+    var c = M.camara.crear({ ancho: 1024, alto: 768 });
+    [[200, 150], [900, 700], [512, 384]].forEach(function (ancla) {
+      var antes = c.aMundo(ancla[0], ancla[1]);
+      c.zoom(2.4, ancla[0], ancla[1]);
+      var despues = c.aMundo(ancla[0], ancla[1]);
+      afirmar(Math.abs(antes.x - despues.x) < 1e-6 && Math.abs(antes.y - despues.y) < 1e-6,
+        'el punto de anclaje se movió: cualquier otra cosa se siente rota');
+    });
+  });
+
+  caso('lienzo: cámara', 'la escala tiene topes', function () {
+    var c = M.camara.crear({ ancho: 800, alto: 600 });
+    for (var i = 0; i < 60; i++) c.zoom(2, 400, 300);
+    igual(c.estado.escala, M.camara.ESCALA_MAX, 'no puede pasarse por arriba');
+    for (i = 0; i < 120; i++) c.zoom(0.5, 400, 300);
+    igual(c.estado.escala, M.camara.ESCALA_MIN, 'ni por abajo');
+  });
+
+  caso('lienzo: cámara', 'el encuadre mete todo el grafo dentro', function () {
+    var c = M.camara.crear({ ancho: 800, alto: 600 });
+    var caja = { minX: -500, maxX: 500, minY: -250, maxY: 250 };
+    c.ajustarA(caja, 60);
+    var esquinas = [[caja.minX, caja.minY], [caja.maxX, caja.maxY]];
+    esquinas.forEach(function (e) {
+      var p = c.proyectar(e[0], e[1], 0);
+      afirmar(p.x >= 0 && p.x <= 800 && p.y >= 0 && p.y <= 600,
+        'una esquina quedó fuera de la pantalla: ' + JSON.stringify(p));
+    });
+  });
+
+  caso('lienzo: cámara', 'en 3D lo cercano se agranda', function () {
+    var c = M.camara.crear({ ancho: 800, alto: 600, dim: 3 });
+    var lejos = c.proyectar(100, 0, 400);
+    var cerca = c.proyectar(100, 0, -400);
+    afirmar(cerca.k > lejos.k, 'la perspectiva debe agrandar lo cercano');
+  });
+
+  caso('lienzo: cámara', 'la caja envolvente ignora lo invisible', function () {
+    var pos = new Float32Array([0, 0, 1000, 1000, 5, 5]);
+    var visible = new Uint8Array([1, 0, 1]);
+    var caja = M.camara.cajaDe(pos, 3, 2, visible);
+    igual(caja.maxX, 5, 'el nodo oculto no puede estirar el encuadre');
+  });
+
+  // ------------------------------------------------------- ruta de lectura ---
+  caso('ruta de lectura', 'prefiere el camino de aristas fuertes al atajo débil', function () {
+    var aristas = [
+      { a: 0, b: 1, peso: 10 }, { a: 1, b: 2, peso: 10 }, { a: 2, b: 3, peso: 10 },
+      { a: 0, b: 3, peso: 0.2 }
+    ];
+    var r = M.grafo.ruta.calcular(4, aristas, 0, 3);
+    igual(r.camino.join('-'), '0-1-2-3',
+      'una arista fuerte es un paso barato: tres saltos sólidos valen menos que uno flojo');
+    afirmar(r.coste < 1 / 0.2, 'el coste debe ser menor que el del atajo');
+  });
+
+  caso('ruta de lectura', 'declara cuando no hay camino en vez de inventarlo', function () {
+    var r = M.grafo.ruta.calcular(4, [{ a: 0, b: 1, peso: 1 }, { a: 2, b: 3, peso: 1 }], 0, 3);
+    afirmar(r.existe === false);
+    igual(r.camino.length, 0);
+    contiene(r.motivo, 'componentes distintas');
+  });
+
+  caso('ruta de lectura', 'respeta el umbral de afinidad al cruzar documentos', function () {
+    var aristas = [
+      { a: 0, b: 1, tipo: 'afinidad', coseno: 0.4 },
+      { a: 1, b: 2, tipo: 'afinidad', coseno: 0.1 }
+    ];
+    afirmar(M.grafo.ruta.calcular(3, aristas, 0, 2, { umbralAfinidad: 0.05 }).existe,
+      'con el umbral bajo el camino existe');
+    afirmar(!M.grafo.ruta.calcular(3, aristas, 0, 2, { umbralAfinidad: 0.3 }).existe,
+      'con el umbral alto la arista floja desaparece y el camino con ella');
+  });
+
+  caso('ruta de lectura', 'el montículo saca siempre el menor', function () {
+    var m = M.grafo.ruta.monticulo();
+    var valores = [7, 3, 9, 1, 8, 2, 5];
+    valores.forEach(function (v) { m.meter(v, 'v' + v); });
+    var salida = [];
+    while (!m.vacio()) salida.push(m.sacar().clave);
+    igual(salida.join(','), '1,2,3,5,7,8,9');
+  });
+
+  caso('ruta de lectura', 'el plan de lectura no repite documentos', function () {
+    var nodos = [{ lema: 'a', forma: 'A' }, { lema: 'b', forma: 'B' }, { lema: 'c', forma: 'C' }];
+    var docs = new Map([
+      ['a', new Set(['1.md'])],
+      ['b', new Set(['1.md', '2.md'])],
+      ['c', new Set(['2.md'])]
+    ]);
+    var plan = M.grafo.ruta.planDeLectura([0, 1, 2], nodos, docs);
+    igual(plan.documentos.join(','), '1.md,2.md');
+    afirmar(plan.pasos[2].yaCubierto === true, 'el tramo ya cubierto se declara, no se rellena con un repetido');
   });
 
   return { casos: casos, afirmar: afirmar, igual: igual, contiene: contiene, noContiene: noContiene };

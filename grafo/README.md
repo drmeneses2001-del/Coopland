@@ -17,7 +17,7 @@ existen y se muestran en paneles; el lienzo interactivo llega en la fase 5.
 | 2 | Índice persistente e incremental en IndexedDB, diff, panel «Qué cambió», instantáneas | terminada |
 | 3 | Grafo de tres capas (conceptos, documentos, mixta), comunidades, intermediación, diversidad temática | terminada |
 | 4 | Brechas estructurales, documentos aislados, conceptos puente ausentes | pendiente |
-| 5 | Lienzo, panel lateral, deslizador temporal | pendiente |
+| 5 | Lienzo, panel lateral, deslizador temporal, visor con trazabilidad, ruta de lectura | terminada |
 | 6 | Capa de IA opcional | pendiente |
 | 7 | Exportables | pendiente |
 
@@ -314,6 +314,70 @@ un documento era un número fijo de palabras, y un número fijo declara aislado 
 medio archivo de notas breves y a ninguno de un archivo de artículos. Ahora el
 listón es la **mediana de términos propios del propio corpus**, y el panel
 muestra qué umbral se usó.
+
+### El lienzo
+
+**Canvas 2D, no SVG y no WebGL.** SVG queda descartado por la especificación y
+por la aritmética: cada nodo sería un elemento del DOM con su recálculo de
+estilo, y el iPad se rinde mucho antes de los mil. WebGL daría más techo, pero
+el techo del canvas 2D ya sobra para el objetivo, y el 2D no arrastra pérdidas
+de contexto ni una tubería de sombreadores que mantener. Medido en este entorno,
+dibujando **todos** los nodos a la vez:
+
+| nodos | aristas | mediana por cuadro | p95 |
+|---|---|---|---|
+| 2 000 | 6 106 | 4,7 ms | 6,2 ms |
+| 5 000 | 15 481 | 8,2 ms | 12,9 ms |
+| 10 000 | 31 106 | 16,3 ms | 20,6 ms |
+
+El presupuesto de un cuadro a 60 fps son 16,7 ms, así que 5 000 nodos entran con
+holgura y 10 000 quedan justo en el límite. En uso normal sólo hay 320 nodos
+visibles al abrir. La cifra de un iPad será otra: por eso el lienzo muestra los
+cuadros por segundo reales en su esquina, y no hay que creerle a esta tabla.
+
+Lo que sostiene esas cifras son tres decisiones, no el trazado en sí: recortar
+por la ventana visible, agrupar las aristas por color en un solo camino —cambiar
+de estilo es lo caro, no trazar la línea—, y bajar el nivel de detalle al
+alejarse, porque a esa escala nadie distingue una arista de peso 1.
+
+**El tamaño del nodo es relativo al máximo de su propio grafo.** La
+intermediación normalizada divide por el número de pares posibles, así que en un
+grafo de treinta nodos vale cien veces más que en uno de tres mil. Con una
+fórmula absoluta, el mismo código dibujaba puntos invisibles en un corpus grande
+y globos que se comían la pantalla en uno pequeño. Ese fallo se vio en la
+primera captura y se corrigió antes de seguir.
+
+**La simulación vive en su propio worker** y devuelve un `Float32Array` de
+posiciones que el hilo principal sólo dibuja. Los búferes se reciclan entre los
+dos lados en vez de asignar uno por cuadro. La repulsión usa una rejilla
+espacial con radio de corte —vale igual en dos y en tres dimensiones, que es lo
+que permite el conmutador 2D/3D sin duplicar el motor— y los nodos de la misma
+comunidad se atraen algo más, sin lo cual los colores quedan salpicados y el
+mapa deja de leerse de un vistazo.
+
+**El bucle de dibujo no dibuja siempre**, sólo cuando algo cambió. Un iPad
+redibujando diez mil nodos sesenta veces por segundo sin que nada se mueva se
+calienta y gasta batería para no enseñar nada nuevo.
+
+**La trazabilidad es la razón de que las aristas guarden muestras.** Cada arista
+de la capa de conceptos conserva de qué documento y de qué oración salió, así
+que al abrir un documento desde un nodo se subrayan exactamente las líneas que
+produjeron sus conexiones, con el concepto del otro extremo en el título de cada
+una. Si el panel afirma algo, se puede ir a ver dónde se dijo.
+
+**La ruta de lectura pesa las aristas al revés de lo que parece.** «Corto» no es
+«pocos saltos»: una arista fuerte —dos conceptos que aparecen juntos una y otra
+vez— es un paso barato, y una floja es cara aunque sea un solo salto. El coste
+de cruzar una arista es 1/peso, y el resultado se traduce a una secuencia
+ordenada de documentos sin repetir ninguno.
+
+Cuatro fallos de interfaz que sólo aparecieron al conducir la aplicación de
+verdad, y que ninguna prueba unitaria habría encontrado: el panel lateral
+estiraba la fila de la rejilla y el lienzo crecía al doble de la pantalla con la
+mitad fuera del alcance del dedo; el deslizador temporal tapaba los botones de
+la ficha del nodo; el botón de plegar el panel se anclaba al viewport en lugar
+de al mapa y quedaba recortado; y una vez recolocado, tapaba la última pestaña
+del panel. Los cuatro están corregidos y comentados en el sitio.
 
 ---
 
