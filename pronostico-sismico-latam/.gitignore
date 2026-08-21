@@ -1,14 +1,8 @@
+# Salida generada por ejemplos/informe_completo.py.
+# La copia versionada, para consultar sin ejecutar nada, esta en
+# ejemplos/informe-ejemplo.html
+/informe.html
+
 __pycache__/
-*.py[cod]
-.pytest_cache/
-.coverage
-htmlcov/
 *.egg-info/
-build/
-dist/
-.venv/
-venv/
-# Instantaneas de catalogo: pueden ser grandes y su redistribucion depende de
-# la licencia de cada agencia. Ver docs/01-fuentes-verificadas.md.
-instantaneas/
-*.parquet
+.pytest_cache/
