@@ -462,3 +462,28 @@ los corpus medidos cuesta decenas de milisegundos y la corrección está
 garantizada; si un archivo real lo vuelve lento, el punto donde atacarlo es
 `grafista.js`, guardando las parejas de co-ocurrencia por documento para poder
 sumarlas en vez de re-tokenizar.
+
+## Archivo único
+
+`grafo/grafo-de-conocimiento.html` es la aplicación completa —las siete
+fases— empaquetada en un solo archivo: sin `sw.js`, sin `manifest.webmanifest`
+ni carpetas `css/`, `js/` o `vendor/` por separado. Sirve para llevar la
+aplicación a un repositorio distinto: basta con subir ese archivo (renombrado
+a `index.html` si va a ser la portada de un sitio de GitHub Pages).
+
+Los tres workers (extractor, grafista, simulador) y el módulo del SDK de
+Anthropic no pueden cargarse por ruta relativa ni por `importScripts` dentro
+de un archivo suelto, así que se incrustan como texto y se instancian en
+tiempo de ejecución vía `Blob` + `URL.createObjectURL`. El worker anidado de
+pdf.js recibe el mismo tratamiento dentro del extractor.
+
+Se regenera con:
+
+```
+node grafo/empaquetar.js
+```
+
+Verificado en Chromium sin conexión: los tres workers responden, el SDK
+carga vía `import()` de un Blob URL y expone `window.Anthropic`, y el ciclo
+completo —ingesta de las 10 muestras, construcción del grafo, y las cuatro
+exportaciones— corre sin ningún error de consola.
